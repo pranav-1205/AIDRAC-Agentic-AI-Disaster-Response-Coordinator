@@ -1,15 +1,18 @@
-import { CloudSun, AlertTriangle, MapPin, Activity } from 'lucide-react';
+import { CloudSun, AlertTriangle, MapPin, Activity, RefreshCw, Droplets } from 'lucide-react';
 import DashboardCard from '../components/DashboardCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorState from '../components/ErrorState';
+import LocationStatus from '../components/LocationStatus';
 import { useApi } from '../hooks/useApi';
-import { weatherApi, disasterApi, alertApi, shelterApi, hospitalApi } from '../services/api';
-import { Weather, Disaster, Alert, Shelter, Hospital } from '../types';
+import { useGeolocation } from '../hooks/useGeolocation';
+import { useWeather } from '../hooks/useWeather';
+import { disasterApi, alertApi, shelterApi, hospitalApi } from '../services/api';
+import type { Disaster, Alert, Shelter, Hospital } from '../types';
 
 export default function Dashboard() {
-  const { data: weather, loading: weatherLoading, error: weatherError } = useApi<Weather>(
-    () => weatherApi.get(28.6139, 77.209)
-  );
+  const geolocation = useGeolocation({ watch: false });
+  const { weather, loading: weatherLoading, error: weatherError } = useWeather(geolocation.position);
+
   const { data: disasters, loading: disastersLoading } = useApi<Disaster[]>(
     () => disasterApi.getActive()
   );
@@ -24,9 +27,12 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 mt-1">Real-time disaster response overview</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500 mt-1">Real-time disaster response overview</p>
+        </div>
+        <LocationStatus geolocation={geolocation} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -63,10 +69,11 @@ export default function Dashboard() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <CloudSun className="h-5 w-5 text-primary-500" />
             Current Weather
+            {weatherLoading && !weather && <RefreshCw className="h-4 w-4 animate-spin text-gray-400" />}
           </h2>
-          {weatherLoading ? (
+          {weatherLoading && !weather ? (
             <LoadingSpinner size="sm" />
-          ) : weatherError ? (
+          ) : weatherError && !weather ? (
             <ErrorState message={weatherError} />
           ) : weather ? (
             <div className="flex items-center gap-6">
@@ -78,10 +85,19 @@ export default function Dashboard() {
                 <p>Feels like: {weather.feels_like}°C</p>
                 <p>Humidity: {weather.humidity}%</p>
                 <p>Wind: {weather.wind_speed} m/s</p>
-                <p className="text-xs text-gray-400">{weather.city}</p>
+                <p className="flex items-center gap-1"><Droplets className="h-3 w-3" /> Rain: {weather.rain > 0 ? `${weather.rain} mm/h` : 'None'}</p>
+                <p className="text-xs text-gray-400">
+                  {weather.city}
+                  {weather.is_mock && ' (mock)'}
+                </p>
               </div>
             </div>
-          ) : null}
+          ) : (
+            <div className="flex items-center justify-center py-8 text-gray-400">
+              <MapPin className="h-5 w-5 mr-2" />
+              Enable GPS for local weather
+            </div>
+          )}
         </div>
 
         <div className="card">

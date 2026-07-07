@@ -52,6 +52,7 @@ export interface Weather {
   humidity: number;
   description: string;
   wind_speed: number;
+  rain: number;
   icon: string;
   city: string;
   is_mock: boolean;
@@ -62,4 +63,30 @@ export interface AuthState {
   token: string | null;
   loading: boolean;
   error: string | null;
+}
+
+export interface GeoPosition {
+  lat: number;
+  lng: number;
+}
+
+export interface GeolocationState {
+  position: GeoPosition | null;
+  error: string | null;
+  loading: boolean;
+  permissionDenied: boolean;
+  unsupported: boolean;
+}
+
+export interface NearestItem<T> {
+  item: T;
+  distanceKm: number;
+}
+
+export interface RouteInfo {
+  coordinates: [number, number][];
+  distanceKm: number;
+  durationMin: number;
+  steps: string[];
+  provider: 'openrouteservice' | 'osrm' | 'straight-line';
 }

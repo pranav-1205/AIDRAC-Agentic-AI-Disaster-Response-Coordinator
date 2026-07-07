@@ -14,6 +14,7 @@ class WeatherService:
                 "humidity": 75,
                 "description": "Partly cloudy",
                 "wind_speed": 12,
+                "rain": 0,
                 "icon": "04d",
                 "city": "Sample City",
                 "is_mock": True,
@@ -31,12 +32,16 @@ class WeatherService:
             )
             response.raise_for_status()
             data = response.json()
+            rain = 0
+            if "rain" in data:
+                rain = data["rain"].get("1h", data["rain"].get("3h", 0))
             return {
                 "temperature": data["main"]["temp"],
                 "feels_like": data["main"]["feels_like"],
                 "humidity": data["main"]["humidity"],
                 "description": data["weather"][0]["description"],
                 "wind_speed": data["wind"]["speed"],
+                "rain": rain,
                 "icon": data["weather"][0]["icon"],
                 "city": data["name"],
                 "is_mock": False,

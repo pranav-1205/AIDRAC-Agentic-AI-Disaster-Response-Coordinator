@@ -1,419 +1,181 @@
-# 🚨 AIDRAC – Agentic AI Disaster Response Coordinator
+# AIDRAC - Agentic AI Disaster Response Coordinator
 
-> **Autonomous AI for Smarter, Faster, and Safer Disaster Response**
+A full-stack disaster management application that helps citizens during natural disasters by providing safe evacuation routes, nearby shelters, hospitals, weather information, and emergency alerts.
 
-> 🚧 **Project Status:** Phase 1 Completed | Phase 2 (Agentic AI) In Progress
+## Tech Stack
 
-![Python](https://img.shields.io/badge/Python-3.12-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green)
-![React](https://img.shields.io/badge/React-18-61DAFB)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+### Frontend
+- **React 18** with TypeScript
+- **Vite** for build tooling
+- **Tailwind CSS** for styling
+- **React Router v6** for routing
+- **Leaflet + OpenStreetMap** for interactive maps
+- **Axios** for API calls
+- **Lucide React** for icons
 
----
+### Backend
+- **FastAPI** (Python async web framework)
+- **SQLAlchemy 2.0** (async ORM)
+- **PostgreSQL** (database)
+- **Pydantic v2** (validation)
+- **Alembic** (migrations)
+- **JWT** authentication
+- **bcrypt** password hashing
 
-## 🌍 Sustainable Development Goals (SDGs)
+## Project Structure
 
-- 🏙️ **SDG 11 – Sustainable Cities & Communities**
-- 🌱 **SDG 13 – Climate Action**
-
----
-
-# 📖 Overview
-
-AIDRAC (Agentic AI Disaster Response Coordinator) is a full-stack disaster management platform designed to assist citizens and emergency authorities during natural disasters such as floods, cyclones, earthquakes, and fires.
-
-The platform provides real-time disaster information, nearby shelters, hospitals, emergency alerts, weather information, and interactive maps to support emergency response.
-
-> **Phase 1** focuses on building a robust disaster management platform.  
-> **Phase 2** introduces Agentic AI capable of autonomous disaster coordination using multiple AI agents.
-
----
-
-# ✨ Features
-
-## 🔐 Authentication
-
-- JWT Authentication
-- User Registration
-- Secure Login
-- Role-Based Access (Admin/User)
-- Protected Routes
-
----
-
-## 📊 Dashboard
-
-- Disaster Overview
-- Live Weather Information
-- Active Alerts
-- Emergency Statistics
-- Quick Access Actions
-
----
-
-## 🗺️ Interactive Maps
-
-- User Location
-- Shelter Locations
-- Hospital Locations
-- Disaster Zones
-- Severity Indicators
-- OpenStreetMap Integration
-
----
-
-## 🏠 Shelter Management
-
-- View Available Shelters
-- Capacity Monitoring
-- Occupancy Tracking
-- Contact Details
-- Location Information
-
----
-
-## 🏥 Hospital Management
-
-- Nearby Hospitals
-- Emergency Availability
-- Contact Information
-- Interactive Map Integration
-
----
-
-## 🚨 Disaster Management
-
-- Active Disaster Tracking
-- Disaster Severity Levels
-- Emergency Alerts
-- Disaster Status Monitoring
-
----
-
-## 👨‍💼 Admin Dashboard
-
-- Manage Shelters
-- Manage Hospitals
-- Monitor Active Disasters
-- View Emergency Alerts
-- System Overview
-
----
-
-# 🛠️ Tech Stack
-
-## Frontend
-
-- React 18
-- TypeScript
-- Vite
-- Tailwind CSS
-- React Router v6
-- React Leaflet
-- Axios
-- Lucide React
-
----
-
-## Backend
-
-- FastAPI
-- SQLAlchemy 2.0 (Async)
-- PostgreSQL
-- Pydantic v2
-- Alembic
-- JWT Authentication
-- bcrypt Password Hashing
-
----
-
-## DevOps
-
-- Docker
-- Docker Compose
-- NGINX
-
----
-
-# 🏗️ System Architecture
-
-```text
-                User
-                  │
-                  ▼
-        React Frontend (Vite)
-                  │
-           REST API (Axios)
-                  │
-                  ▼
-          FastAPI Backend
-                  │
-      ┌───────────┴───────────┐
-      │                       │
- Authentication         Business Logic
-      │                       │
-      └───────────┬───────────┘
-                  ▼
-          PostgreSQL Database
 ```
-
----
-
-# 📂 Project Structure
-
-```text
 aidrac/
 ├── backend/
 │   ├── app/
-│   │   ├── config/
-│   │   ├── database/
-│   │   ├── models/
-│   │   ├── schemas/
-│   │   ├── routers/
-│   │   ├── services/
-│   │   ├── utils/
-│   │   └── main.py
-│   ├── alembic/
+│   │   ├── config/          # Application settings
+│   │   ├── database/        # DB connection & seed data
+│   │   ├── models/          # SQLAlchemy models
+│   │   ├── schemas/         # Pydantic schemas
+│   │   ├── routers/         # API route handlers
+│   │   ├── services/        # Business logic layer
+│   │   └── utils/           # Auth, dependencies
+│   ├── alembic/             # Database migrations
 │   ├── requirements.txt
 │   └── Dockerfile
-│
 ├── frontend/
 │   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   ├── context/
-│   │   ├── hooks/
-│   │   └── types/
+│   │   ├── components/      # Reusable UI components
+│   │   ├── pages/           # Route pages
+│   │   ├── services/        # API client
+│   │   ├── hooks/           # Custom hooks (useGeolocation, useWeather, useApi)
+│   │   ├── utils/           # Helpers (haversine, routing)
+│   │   ├── context/         # Auth context
+│   │   └── types/           # TypeScript types
 │   ├── package.json
 │   ├── Dockerfile
 │   └── nginx.conf
-│
 ├── docker-compose.yml
 └── README.md
 ```
 
----
+## Features
 
-# 📡 REST API
+### Phase 1 (Complete)
+- **Interactive Map** with disaster zones, shelters, and hospitals
+- **Real-time Weather** data via OpenWeather API (mock fallback)
+- **Shelter Management** with occupancy tracking
+- **Hospital Directory** with emergency availability
+- **Emergency Alerts** system with severity levels
+- **User Authentication** with JWT
+- **Admin Dashboard** for system overview
+- **Responsive Design** optimized for all devices
+
+### Phase 2 (Complete)
+- **Browser GPS** via `navigator.geolocation.watchPosition` with continuous tracking
+- **Nearest Shelter/Hospital** using Haversine distance formula
+- **Real Routing** via OpenRouteService API (ORS) with OSRM public API fallback
+- **Straight-line fallback** if both routing APIs are unavailable
+- **Disaster Radius Circles** scaled by severity (critical: 3km, severe: 2km, high: 1.5km, moderate: 1km)
+- **Weather by GPS coordinates** with 5-minute auto-refresh
+- **Enhanced Emergency Button** — finds nearest shelter + hospital, computes safest route, zooms map
+- **Location status indicator** showing GPS state (acquiring, denied, unsupported, active)
+- **Route Panel** with turn-by-turn directions, distance, and estimated walking time
+- **Lazy-loaded map** for faster initial page load
+- **Memoized nearest-location calculations** to avoid unnecessary re-renders
+- **Graceful error handling** —cached data on API failure, straight-line fallback on routing failure, GPS permission denied messaging
+
+## API Endpoints
 
 | Method | Endpoint | Description |
-|----------|-------------------------|--------------------------|
-| POST | `/api/auth/register` | Register User |
-| POST | `/api/auth/login` | User Login |
-| GET | `/api/users/me` | Current User |
-| GET | `/api/weather` | Weather Data |
-| GET | `/api/shelters` | List Shelters |
-| POST | `/api/shelters` | Create Shelter |
-| PUT | `/api/shelters/{id}` | Update Shelter |
-| DELETE | `/api/shelters/{id}` | Delete Shelter |
-| GET | `/api/hospitals` | List Hospitals |
-| POST | `/api/hospitals` | Create Hospital |
-| GET | `/api/disasters` | List Disasters |
-| GET | `/api/disasters/active` | Active Disasters |
-| POST | `/api/disasters` | Create Disaster |
-| GET | `/api/alerts` | List Alerts |
-| POST | `/api/alerts` | Create Alert |
-| GET | `/api/routes` | List Routes |
-| POST | `/api/routes` | Create Route |
+|--------|----------|-------------|
+| POST | `/api/auth/register` | Register new user |
+| POST | `/api/auth/login` | Login user |
+| GET | `/api/users/me` | Get current user |
+| GET | `/api/weather?lat=&lng=` | Get weather by GPS coords |
+| GET | `/api/shelters` | List all shelters |
+| POST | `/api/shelters` | Create shelter (admin) |
+| PUT | `/api/shelters/{id}` | Update shelter (admin) |
+| DELETE | `/api/shelters/{id}` | Delete shelter (admin) |
+| GET | `/api/hospitals` | List all hospitals |
+| POST | `/api/hospitals` | Create hospital (admin) |
+| GET | `/api/disasters` | List all disasters |
+| GET | `/api/disasters/active` | List active disasters |
+| POST | `/api/disasters` | Create disaster (admin) |
+| GET | `/api/alerts` | List all alerts |
+| POST | `/api/alerts` | Create alert (admin) |
+| GET | `/api/routes` | List evacuation routes |
+| POST | `/api/routes` | Create route |
 
----
+## Setup Instructions
 
-# 🚀 Getting Started
-
-## Prerequisites
-
+### Prerequisites
 - Python 3.12+
 - Node.js 20+
 - PostgreSQL 16+
-- Docker Desktop (Recommended)
+- Docker (optional)
 
----
+### Local Development
 
-## Clone Repository
-
+#### 1. Clone the repository
 ```bash
-git clone https://github.com/<your-username>/AIDRAC.git
-
-cd AIDRAC
+git clone <repo-url>
+cd aidrac
 ```
 
----
-
-## Run with Docker (Recommended)
-
-```bash
-docker compose up --build
-```
-
-### Access the application
-
-Frontend
-
-```
-http://localhost
-```
-
-Backend
-
-```
-http://localhost:8000
-```
-
-Swagger API Documentation
-
-```
-http://localhost:8000/docs
-```
-
----
-
-## Run Locally
-
-### Backend
-
+#### 2. Backend Setup
 ```bash
 cd backend
-
 python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# Linux/macOS
-source venv/bin/activate
-
+source venv/bin/activate  # On Windows: .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
+# Configure environment
+cp .env.example .env
+# Edit .env with your database credentials and API keys
+
+# Run database migrations
+alembic upgrade head
+
+# Start server
 uvicorn app.main:app --reload
 ```
 
----
-
-### Frontend
-
+#### 3. Frontend Setup
 ```bash
 cd frontend
-
+cp ../.env.example .env
+# Add VITE_ORS_API_KEY for routing (optional)
 npm install
-
 npm run dev
 ```
 
----
+#### 4. Open in browser
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
 
-# 🔑 Demo Credentials
-
-## 👨‍💼 Admin
-
-```
-Email:
-admin@aidrac.com
-
-Password:
-admin123
-```
-
----
-
-## 👤 User
-
-```
-Email:
-user@aidrac.com
-
-Password:
-user123
+### Docker Setup
+```bash
+# Create .env from template
+cp .env.example .env
+# Edit with your keys
+docker-compose up --build
 ```
 
----
+### Environment Variables
 
-# 📸 Screenshots
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `POSTGRES_USER` | Yes | PostgreSQL username |
+| `POSTGRES_PASSWORD` | Yes | PostgreSQL password |
+| `POSTGRES_DB` | Yes | PostgreSQL database name |
+| `SECRET_KEY` | Yes | JWT signing secret |
+| `OPENWEATHER_API_KEY` | No | OpenWeather API key (mock data used if empty) |
+| `VITE_ORS_API_KEY` | No | OpenRouteService API key (OSRM fallback if empty) |
 
-> Add screenshots of:
+### Demo Credentials
+- **Admin:** admin@aidrac.com / admin123
+- **User:** user@aidrac.com / user123
 
-- Landing Page
-- Login
-- Dashboard
-- Interactive Map
-- Shelter Page
-- Hospital Page
-- Admin Dashboard
-- Swagger API
-
----
-
-# ✅ Phase 1 Completed
-
-- JWT Authentication
-- User Registration & Login
-- PostgreSQL Integration
-- Interactive Maps
-- Disaster Dashboard
-- Shelter Management
-- Hospital Management
-- Emergency Alerts
-- REST APIs
-- Docker Deployment
-- Swagger Documentation
-- Responsive UI
-
----
-
-# 🚀 Phase 2 Roadmap (Agentic AI)
-
-- Gemini API Integration
-- LangGraph Orchestrator
-- Weather Agent
-- Route Planning Agent
-- Shelter Recommendation Agent
-- Medical Assistance Agent
-- Emergency Alert Agent
-- Dynamic Evacuation Planning
-- Intelligent Decision Support
-
----
-
-# 🌟 Future Enhancements
-
-- Drone Integration
-- Satellite Imagery Analysis
-- IoT Sensor Integration
-- Voice Assistant
-- Government API Integration
-- Predictive Disaster Analytics
-- SMS & WhatsApp Notifications
-- Offline Emergency Mode
-
----
-
-# 🤝 Contributing
-
-Contributions are welcome!
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push the branch
-5. Open a Pull Request
-
----
-
-# 📄 License
-
-This project is licensed under the **MIT License**.
-
----
-
-# 👨‍💻 Author
-
-**Pranav Vivek Sadwelkar**
-
-- GitHub: https://github.com/<your-username>
-- LinkedIn: https://linkedin.com/in/<your-linkedin>
-
----
-
-⭐ **If you found this project helpful, please consider giving it a Star on GitHub!**
+## Phase 3 Roadmap
+- Agentic AI integration (LangGraph/CrewAI)
+- Autonomous disaster response coordination
+- LLM-powered decision support
+- Predictive analytics for disaster forecasting
+- Multi-agent coordination for resource allocation

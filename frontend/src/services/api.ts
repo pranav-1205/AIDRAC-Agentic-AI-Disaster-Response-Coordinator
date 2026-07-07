@@ -62,8 +62,31 @@ export const routeApi = {
 };
 
 export const weatherApi = {
-  get: (lat?: number, lng?: number) =>
+  get: (lat: number, lng: number) =>
     api.get('/weather', { params: { lat, lng } }),
+};
+
+export const routingApi = {
+  ors: (start: [number, number], end: [number, number], apiKey: string) => {
+    const body = {
+      coordinates: [
+        [start[1], start[0]],
+        [end[1], end[0]],
+      ],
+      instructions: true,
+      geometry: true,
+      format: 'geojson',
+    };
+    return fetch('https://api.openrouteservice.org/v2/directions/foot-walking/geojson', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: apiKey },
+      body: JSON.stringify(body),
+    }).then((r) => r.json());
+  },
+  osrm: (start: [number, number], end: [number, number]) => {
+    const url = `https://router.project-osrm.org/route/v1/foot/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true`;
+    return fetch(url).then((r) => r.json());
+  },
 };
 
 export default api;

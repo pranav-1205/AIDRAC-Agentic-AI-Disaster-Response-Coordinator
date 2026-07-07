@@ -1,9 +1,9 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import MapPage from './pages/MapPage';
 import Shelters from './pages/Shelters';
 import Hospitals from './pages/Hospitals';
 import AlertsPage from './pages/AlertsPage';
@@ -11,6 +11,9 @@ import Admin from './pages/Admin';
 import NotFound from './pages/NotFound';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './components/AppLayout';
+import LoadingSpinner from './components/LoadingSpinner';
+
+const MapPage = lazy(() => import('./pages/MapPage'));
 
 function ProtectedLayout({ children, requireAdmin = false }: { children: React.ReactNode; requireAdmin?: boolean }) {
   return (
@@ -18,6 +21,10 @@ function ProtectedLayout({ children, requireAdmin = false }: { children: React.R
       <AppLayout>{children}</AppLayout>
     </ProtectedRoute>
   );
+}
+
+function SuspenseWrapper({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>;
 }
 
 export default function App() {
@@ -38,7 +45,9 @@ export default function App() {
         path="/map"
         element={
           <ProtectedLayout>
-            <MapPage />
+            <SuspenseWrapper>
+              <MapPage />
+            </SuspenseWrapper>
           </ProtectedLayout>
         }
       />
