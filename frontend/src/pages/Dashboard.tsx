@@ -6,8 +6,8 @@ import LocationStatus from '../components/LocationStatus';
 import { useApi } from '../hooks/useApi';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useWeather } from '../hooks/useWeather';
-import { disasterApi, alertApi, shelterApi, hospitalApi } from '../services/api';
-import type { Disaster, Alert, Shelter, Hospital } from '../types';
+import { disasterApi, alertApi, shelterApi, hospitalApi, locationApi } from '../services/api';
+import type { Disaster, Alert, Shelter, Hospital, NearbyResponse } from '../types';
 
 export default function Dashboard() {
   const geolocation = useGeolocation({ watch: false });
@@ -19,11 +19,19 @@ export default function Dashboard() {
   const { data: alerts, loading: alertsLoading } = useApi<Alert[]>(
     () => alertApi.getAll()
   );
-  const { data: shelters } = useApi<Shelter[]>(() => shelterApi.getAll());
-  const { data: hospitals } = useApi<Hospital[]>(() => hospitalApi.getAll());
+  const { data: dbShelters } = useApi<Shelter[]>(() => shelterApi.getAll());
+  const { data: dbHospitals } = useApi<Hospital[]>(() => hospitalApi.getAll());
+
+  const { data: nearby } = useApi<NearbyResponse>(
+    () => geolocation.position ? locationApi.nearby(geolocation.position.lat, geolocation.position.lng) : Promise.reject('no gps'),
+    [geolocation.position?.lat, geolocation.position?.lng]
+  );
 
   const activeDisasters = disasters?.filter((d) => d.status === 'active').length ?? 0;
   const criticalAlerts = alerts?.filter((a) => a.severity === 'critical' || a.severity === 'severe').length ?? 0;
+
+  const shelterCount = nearby ? nearby.shelters.length : (dbShelters?.length ?? 0);
+  const hospitalCount = nearby ? nearby.hospitals.length : (dbHospitals?.length ?? 0);
 
   return (
     <div className="space-y-6">
@@ -52,14 +60,16 @@ export default function Dashboard() {
         />
         <DashboardCard
           title="Available Shelters"
-          value={shelters?.length ?? 0}
+          value={shelterCount}
           icon={<MapPin className="h-6 w-6" />}
+          subtitle={nearby ? 'live (OSM)' : 'from database'}
           color="blue"
         />
         <DashboardCard
           title="Hospitals"
-          value={hospitals?.length ?? 0}
+          value={hospitalCount}
           icon={<MapPin className="h-6 w-6" />}
+          subtitle={nearby ? 'live (OSM)' : 'from database'}
           color="green"
         />
       </div>

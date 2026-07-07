@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
     OPENWEATHER_API_KEY: Optional[str] = None
+    OVERPASS_API_URL: str = "https://overpass.openstreetmap.fr/api/interpreter"
 
     class Config:
         env_file = ".env"

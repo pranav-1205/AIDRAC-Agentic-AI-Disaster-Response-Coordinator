@@ -66,6 +66,11 @@ export const weatherApi = {
     api.get('/weather', { params: { lat, lng } }),
 };
 
+export const locationApi = {
+  nearby: (lat: number, lng: number, radius?: number) =>
+    api.get('/location/nearby', { params: { lat, lng, radius: radius ?? 10_000 } }),
+};
+
 export const routingApi = {
   ors: (start: [number, number], end: [number, number], apiKey: string) => {
     const body = {

@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import { MapPin, Navigation, Clock, Footprints } from 'lucide-react';
-import type { RouteInfo, NearestItem, Shelter, Hospital } from '../types';
+import type { RouteInfo, NearestItem, NearbyPlace } from '../types';
 
 interface RoutePanelProps {
   route: RouteInfo | null;
-  nearestShelter: NearestItem<Shelter> | null;
-  nearestHospital: NearestItem<Hospital> | null;
+  nearestShelter: NearestItem<NearbyPlace> | null;
+  nearestHospital: NearestItem<NearbyPlace> | null;
   routeLoading: boolean;
   onClose: () => void;
 }
@@ -37,7 +37,20 @@ export default function RoutePanel({
     );
   }
 
-  if (!route && !nearestShelter) return null;
+  if (!route && !nearestShelter && !nearestHospital) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Navigation className="h-4 w-4 text-primary-500" />
+            Emergency Route
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm">&times;</button>
+        </div>
+        <p className="text-sm text-gray-500">No mapped shelters found nearby.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 mb-4 max-h-80 overflow-y-auto">

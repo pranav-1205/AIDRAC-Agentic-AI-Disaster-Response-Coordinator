@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Phone, Navigation } from 'lucide-react';
 import { useGeolocation } from '../hooks/useGeolocation';
-import { shelterApi, hospitalApi } from '../services/api';
+import { locationApi } from '../services/api';
 import { findNearest } from '../utils/haversine';
-import type { Shelter, Hospital } from '../types';
+import type { NearbyPlace } from '../types';
 
 export default function EmergencyButton() {
   const navigate = useNavigate();
@@ -16,14 +16,11 @@ export default function EmergencyButton() {
     if (!position) return;
     setCalculating(true);
     try {
-      const [sheltersRes, hospitalsRes] = await Promise.all([
-        shelterApi.getAll(),
-        hospitalApi.getAll(),
-      ]);
-      const shelters: Shelter[] = sheltersRes.data;
-      const hospitals: Hospital[] = hospitalsRes.data;
-      const nearestShelter = findNearest(shelters, position.lat, position.lng);
-      const nearestHospital = findNearest(hospitals, position.lat, position.lng);
+      const nearby = await locationApi.nearby(position.lat, position.lng);
+      const shelters: NearbyPlace[] = nearby.data.shelters;
+      const hospitals: NearbyPlace[] = nearby.data.hospitals;
+      const nearestShelter = shelters.length > 0 ? findNearest(shelters, position.lat, position.lng) : null;
+      const nearestHospital = hospitals.length > 0 ? findNearest(hospitals, position.lat, position.lng) : null;
 
       navigate('/map', {
         state: {

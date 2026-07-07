@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from app.config.settings import settings
 from app.database.connection import engine, Base, async_session_factory
 from app.database.seed import seed_database
-from app.routers import auth, users, shelters, hospitals, disasters, alerts, routes, weather
+from app.routers import auth, users, shelters, hospitals, disasters, alerts, routes, weather, location
 
 
 @asynccontextmanager
@@ -41,6 +41,7 @@ app.include_router(disasters.router)
 app.include_router(alerts.router)
 app.include_router(routes.router)
 app.include_router(weather.router)
+app.include_router(location.router)
 
 
 @app.get("/api/health")

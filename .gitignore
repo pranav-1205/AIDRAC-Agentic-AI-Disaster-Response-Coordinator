@@ -24,3 +24,6 @@ frontend/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+#context
+backend/docs/

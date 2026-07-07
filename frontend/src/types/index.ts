@@ -90,3 +90,21 @@ export interface RouteInfo {
   steps: string[];
   provider: 'openrouteservice' | 'osrm' | 'straight-line';
 }
+
+export type NearbyCategory = 'hospital' | 'shelter' | 'police' | 'firestation' | 'pharmacy';
+
+export interface NearbyPlace {
+  name: string;
+  latitude: number;
+  longitude: number;
+  distance: number;
+  address: string | null;
+}
+
+export interface NearbyResponse {
+  hospitals: NearbyPlace[];
+  shelters: NearbyPlace[];
+  police: NearbyPlace[];
+  firestations: NearbyPlace[];
+  pharmacies: NearbyPlace[];
+}
