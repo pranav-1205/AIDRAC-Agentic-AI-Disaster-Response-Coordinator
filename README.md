@@ -101,6 +101,30 @@ aidrac/
 - **Dashboard AI Assistant** — question input with formatted recommendation cards
 - **Placeholder System Prompt** — easily replaceable without touching other code
 
+### Phase 3.3A (Complete)
+- **Live CAP Alert Ingestion** — fetches official disaster alerts from IMD CAP RSS feed (with NDMA fallback)
+- **Provider Architecture** — abstract `WeatherProvider`/`AlertProvider` interfaces in `disaster_sources/` package
+- **CAP XML Parsing** — extracts event, headline, severity, urgency, certainty, area, polygons, and expiry from CAP 1.2 alerts
+- **Automated Deduplication** — prevents duplicate alerts via `external_id` unique constraint; expired alerts auto-deleted
+- **Graceful Degradation** — IMD feed → NDMA fallback → empty alerts; never crashes on network errors
+- **Backward Compatible** — existing `GET /api/alerts` and `GET /api/weather` unchanged; ContextBuilder auto-consumes live alerts
+
+### Phase 3.3B/C (Complete)
+- **Background Ingestion** — IMD and NDMA feeds fetched concurrently every 5 minutes via asyncio background task; `GET /api/alerts` reads only from PostgreSQL (zero network on read)
+- **Multi-Source Merge** — IMD and NDMA treated as equal peers; results merged and deduplicated by `external_id`; concurrent CAP XML downloads
+- **Alert History & Soft-Delete** — expired alerts are soft-deleted (`is_active=false`) instead of removed; configurable 30-day retention purge
+- **In-Memory Caching** — RSS and CAP XML responses cached with 5-minute TTL; stale cache served on network failure
+- **Location-Aware Filtering** — `GET /api/alerts?lat=&lng=` returns alerts matching the user's state/area via area string matching; designed for future polygon-based filtering
+- **Demo Data Cleanup** — seed.py no longer creates demo alerts; existing demo alerts marked inactive on first background run; ContextBuilder filters to CAP-only alerts
+- **DisasterProvider Abstraction** — `DisasterProvider` interface with `StaticDisasterProvider` for development data; ready for live disaster API sources
+
+### Phase 3.3C (Complete)
+- **Live OSM Hospitals Page** — `/hospitals` now uses `GET /api/location/nearby` with GPS position to show live hospitals from OpenStreetMap, sorted by distance, with distance, coordinates, and OSM tags displayed
+- **Live OSM Shelters Page** — `/shelters` now merges shelters, community centres, and schools from the location service, sorted by distance with type labels and OSM tags
+- **GPS Location Prompt** — both pages show "Enable Location" button when GPS is unavailable instead of showing stale demo data
+- **Legacy Endpoints Preserved** — `GET /api/hospitals` and `GET /api/shelters` kept as fallback/legacy APIs; no user-facing pages depend on them
+- **Consistent Types** — uses the same `NearbyPlace` and `NearbyResponse` types as the Map page, EmergencyButton, and routing components
+
 ## API Endpoints
 
 | Method | Endpoint | Description |
@@ -118,8 +142,9 @@ aidrac/
 | GET | `/api/disasters` | List all disasters |
 | GET | `/api/disasters/active` | List active disasters |
 | POST | `/api/disasters` | Create disaster (admin) |
-| GET | `/api/alerts` | List all alerts |
+| GET | `/api/alerts` | List active alerts (optional `?lat=&lng=` for location filtering) |
 | POST | `/api/alerts` | Create alert (admin) |
+| GET | `/api/alerts/history` | List expired/deactivated alerts |
 | GET | `/api/routes` | List evacuation routes |
 | POST | `/api/routes` | Create route |
 | POST | `/api/ai/recommendation` | AI emergency recommendation (question, optional lat/lng) |
@@ -193,14 +218,17 @@ docker-compose up --build
 | `GEMINI_API_KEY` | No | Google Gemini API key (AI recommendations disabled if not set) |
 | `GEMINI_MODEL` | No | Gemini model name (default: `gemini-2.5-flash`) |
 | `VITE_ORS_API_KEY` | No | OpenRouteService API key (OSRM fallback if empty) |
+| `IMD_CAP_RSS_URL` | No | Primary IMD CAP RSS feed URL (official India alerts) |
+| `NDMA_CAP_RSS_URL` | No | Secondary NDMA CAP RSS feed URL (fetched concurrently with IMD) |
+| `REFRESH_INTERVAL_SECONDS` | No | Background alert refresh interval (default: 300) |
+| `ALERT_RETENTION_DAYS` | No | Days to retain expired alerts before physical deletion (default: 30) |
 
 ### Demo Credentials
 - **Admin:** admin@aidrac.com / admin123
 - **User:** user@aidrac.com / user123
 
 ## Phase 3.3+ Roadmap
-- Agentic AI integration (LangGraph/CrewAI)
+- LangGraph Shelter Agent — AI-driven safe destination scoring using disaster type, weather severity, road accessibility, and shelter capacity
 - Autonomous disaster response coordination
-- LLM-powered decision support
 - Predictive analytics for disaster forecasting
 - Multi-agent coordination for resource allocation

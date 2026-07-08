@@ -783,14 +783,301 @@ This changelog reconstructs the development history of AIDRAC by analyzing the e
 
 ---
 
-## Future Phases
+## Phase 3.3A — Live Weather & Official Alert Integration
 
-### Phase 3.3 — Agentic AI (Planned)
+**Objective:** Replace demo disaster alerts with official CAP alerts while preserving the existing API architecture.
+
+### Data Sources
+- **Weather**: Existing OpenWeather integration reused via `OpenWeatherProvider` wrapper
+- **Primary Alerts**: `https://cap-sources.s3.amazonaws.com/in-imd-en/rss.xml` (IMD CAP RSS)
+- **Fallback Alerts**: `https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml` (NDMA CAP RSS)
+- Both URLs configurable via environment variables (`IMD_CAP_RSS_URL`, `NDMA_FALLBACK_RSS_URL`)
+
+### Provider Architecture
+
+Created `backend/app/services/disaster_sources/`:
+
+| File | Responsibility |
+|------|---------------|
+| `base.py` | Abstract `WeatherProvider`/`AlertProvider` interfaces + `WeatherData`/`AlertData` dataclasses |
+| `cap_provider.py` | Fetches IMD CAP RSS feed; parses CAP 1.2 XML; extracts event, headline, description, severity, urgency, certainty, effective/expires, area, polygons; normalizes severity to critical/warning/advisory/info |
+| `openweather_provider.py` | Wraps existing `WeatherService` into `WeatherProvider` interface |
+| `normalizer.py` | Converts `AlertData` → DB dict; datetime parsing; expiry check |
+| `ingestion_service.py` | Orchestrates fetch → normalize → upsert → expire; dedup by `external_id` |
+
+**Architecture Decision:** The rest of the application does not know where data originates. Providers are swap-able implementations of abstract interfaces.
+
+### Database Changes
+- **Alert model extended**: added `external_id` (unique, nullable), `expires_at` (DateTime, nullable), `event`, `urgency`, `certainty`, `area` columns
+- **`message` widened**: `String(2000)` → `Text` to handle long CAP descriptions
+- **Auto-expiry**: alerts with `expires_at < now()` are deleted on each ingestion cycle
+- **Deduplication**: CAP `identifier` → `external_id` unique constraint; existing alerts updated on re-ingestion
+
+### API Changes
+- `GET /api/alerts` — now runs `IngestionService.ingest()` before returning results; filters out expired alerts
+- `POST /api/alerts` — unchanged (admin-only manual alert creation)
+- `GET /api/weather` — unchanged (still uses `WeatherService` directly)
+
+**Backward Compatibility:** All existing endpoints, response schemas, and frontend contracts preserved. `AlertResponse` gains optional fields (`external_id`, `expires_at`, `event`, `urgency`, `certainty`, `area`) that default to `None` for pre-existing alerts.
+
+### AI Integration
+- `ContextBuilder` automatically consumes live CAP alerts from the database — no changes needed
+
+### Error Handling
+- IMD feed → NDMA fallback → empty alerts returned first
+- Network errors, XML parse errors, timeouts — all caught; never crashes
+
+### Config & Environment
+- `settings.py`: added `IMD_CAP_RSS_URL`, `NDMA_FALLBACK_RSS_URL`
+- `.env.example`: updated with both variables
+- No new Python dependencies (uses stdlib `xml.etree.ElementTree`)
+
+### Files Created
+- `backend/app/services/disaster_sources/__init__.py`
+- `backend/app/services/disaster_sources/base.py`
+- `backend/app/services/disaster_sources/cap_provider.py`
+- `backend/app/services/disaster_sources/openweather_provider.py`
+- `backend/app/services/disaster_sources/normalizer.py`
+- `backend/app/services/disaster_sources/ingestion_service.py`
+
+### Files Modified
+- `backend/app/models/alert.py` — CAP columns added, message widened to Text
+- `backend/app/schemas/alert.py` — AlertResponse gains optional CAP fields
+- `backend/app/services/alert.py` — `get_all()`/`get_active()` filter out expired alerts
+- `backend/app/routers/alerts.py` — injection of IngestionService on GET
+- `backend/app/config/settings.py` — IMD_CAP_RSS_URL, NDMA_FALLBACK_RSS_URL
+- `backend/.env.example` — CAP RSS URLs added
+- `.env.example` (root) — CAP RSS URLs added
+- `docs/CHANGELOG_AI.md` — this entry
+- `docs/PROJECT_CONTEXT.md` — Phase 3.3A section, updated structure, env vars
+- `README.md` — Phase 3.3A features, env vars, roadmap
+
+---
+
+## Phase 3.3B/C — Background Ingestion & Alert Pipeline Improvements
+
+**Objective:** Replace on-request ingestion with background refresh, add multi-source merging, alert history, caching, location-aware filtering, and disaster provider abstraction.
+
+### 3.3B.1 Model & Schema Changes
+
+**Objective:** Add columns for alert history, geo-data, and source tracking.
+
+**Changes:**
+- Added `is_active` (Boolean, default True, NOT NULL) to `Alert` model — enables soft-delete for expired alerts
+- Added `expired_at` (DateTime, nullable) — timestamp when alert was soft-expired
+- Added `polygons` (Text, nullable) — semicolon-joined CAP polygon coordinate strings for future geo-filtering
+- Added `source` (String(50), nullable) — tracks origin feed ("imd", "ndma")
+- Created Alembic migration (`2bfd451b4aed_add_alert_history_fields.py`) with `server_default=true` for existing rows
+- Updated `AlertResponse` schema with all new fields
+
+**Key Files:**
+- `backend/app/models/alert.py`
+- `backend/app/schemas/alert.py`
+- `backend/alembic/versions/2bfd451b4aed_add_alert_history_fields.py`
+
+### 3.3B.2 In-Memory Cache Service
+
+**Objective:** Avoid redundant network requests with a simple TTL cache.
+
+**Changes:**
+- Created `CacheService` in `disaster_sources/cache.py`:
+  - In-memory `dict` of `CacheEntry` objects with `value` and `expires_at` (computed from `time.monotonic() + ttl`)
+  - `get(key)` → returns value if not expired, auto-evicts and returns None on expiry
+  - `set(key, value, ttl=300)` — default 5-minute TTL
+  - `clear()` — full cache invalidation (called before each background refresh cycle)
+- No external dependencies — pure Python stdlib
+
+**Key Files:**
+- `backend/app/services/disaster_sources/cache.py`
+
+### 3.3B.3 Multi-Source Concurrent CAP Provider
+
+**Objective:** Replace sequential IMD→NDMA fallback with parallel fetch + merge.
+
+**Changes:**
+- Rewrote `CapProvider` to treat IMD and NDMA as equal peers
+- `__init__` now stores `(url, label)` tuples instead of a single URL list
+- `get_alerts()`:
+  1. Checks `CacheService` for cached merged alerts
+  2. Fires `_safe_process_feed(url, label)` for each source via `asyncio.gather`
+  3. Merges results, deduplicates by `external_id` (first occurrence wins)
+  4. Caches merged list with 5-minute TTL
+  5. On total failure, serves stale cached data if available
+- `_process_feed()` uses per-URL RSS cache key (`rss:{url}`) and per-alert CAP XML cache key (`cap:{url}`)
+- Each `AlertData` now carries a `source` field (default "cap") set to the feed label by `_parse_single_alert`
+
+**Key Files:**
+- `backend/app/services/disaster_sources/cap_provider.py`
+- `backend/app/services/disaster_sources/base.py` (AlertData.source added)
+
+### 3.3B.4 Background Refresh Service
+
+**Objective:** Decouple ingestion from API reads — refresh on a 5-minute timer.
+
+**Changes:**
+- Created `BackgroundIngestion` in `disaster_sources/background_refresh.py`:
+  - `start()`: creates `asyncio.create_task` for the refresh loop; runs an immediate first ingestion
+  - `_run_loop()`: sleeps for `REFRESH_INTERVAL_SECONDS` (default 300), then clears cache and runs `_ingest()`
+  - `stop()`: sets stop event, cancels the task
+  - `_ingest()`: opens its own DB session, runs `_mark_demo_inactive()` → `_sync_alerts()` → `_expire_old()` → `_purge_old_history()`, then commits
+  - `_sync_alerts()`: loads existing CAP alerts by `external_id`, upserts (inserts new, updates existing, reactivates soft-deleted when re-appearing in feed)
+  - `_expire_old()`: soft-deletes alerts where `expires_at < now` (sets `is_active=false`, `expired_at=now`)
+  - `_purge_old_history()`: physically deletes inactive alerts older than `ALERT_RETENTION_DAYS` (default 30)
+  - `_mark_demo_inactive()`: one-time cleanup of seeded alerts (where `external_id IS NULL`)
+- Wired into FastAPI `lifespan` in `main.py`: starts on app startup, stops on shutdown
+
+**Key Files:**
+- `backend/app/services/disaster_sources/background_refresh.py`
+- `backend/app/main.py`
+
+### 3.3B.5 Router & Service Refactoring
+
+**Objective:** Remove live network calls from GET /api/alerts, add location-aware filtering and history endpoint.
+
+**Changes:**
+- **`routers/alerts.py`**: removed `IngestionService` import and `_ingestion.ingest()` call from `GET /api/alerts`. Added optional `lat`/`lng` query parameters. Added new `GET /api/alerts/history` endpoint returning inactive alerts with pagination (limit/offset).
+- **`services/alert.py`**: `get_all()` now filters `is_active == True` AND non-expired. Added `get_history(limit, offset)` returning inactive alerts ordered by `expired_at DESC`. Added `_resolve_state(lat, lng)` using bounding-box heuristics to map coordinates to Indian state. Added `_filter_by_location(alerts, user_state)` matching alert `area` (substring) against user state and nationwide keywords.
+- **`services/disaster_sources/ingestion_service.py`**: simplified — removed `_remove_demo_alerts()` and `_count_alerts()`; `_expire_old()` renamed to `_soft_expire()` and uses soft-delete instead of physical delete.
+- **`services/disaster_sources/normalizer.py`**: `alert_data_to_dict()` now includes `polygons` and `source` fields from `AlertData.source`; removed unused `is_expired()` function.
+
+**Key Files:**
+- `backend/app/routers/alerts.py`
+- `backend/app/services/alert.py`
+- `backend/app/services/disaster_sources/ingestion_service.py`
+- `backend/app/services/disaster_sources/normalizer.py`
+
+### 3.3B.6 Demo Data Cleanup
+
+**Objective:** Remove all seeded demo alerts and ensure production code uses only live data.
+
+**Changes:**
+- **`database/seed.py`**: removed the `alerts` list (10 demo alerts) from the seed function. Alerts now come exclusively from live CAP feeds.
+- **`ai/context_builder.py`**: `select(Alert)` now filters with `.where(Alert.external_id.isnot(None))` to exclude any remaining seeded alerts.
+- Old demo alerts (with `external_id IS NULL`) are marked inactive on the first `BackgroundIngestion._mark_demo_inactive()` run.
+- **Env var rename**: `NDMA_FALLBACK_RSS_URL` → `NDMA_CAP_RSS_URL` to reflect equal-peer status.
+
+**Key Files:**
+- `backend/app/database/seed.py`
+- `backend/app/ai/context_builder.py`
+- `backend/.env` (variable rename)
+- `.env.example` (variable rename)
+
+### 3.3B.7 DisasterProvider Abstraction
+
+**Objective:** Create a pluggable disaster data source interface while preserving development data.
+
+**Changes:**
+- Created `disaster_provider.py` with `DisasterData` dataclass, `DisasterProvider` abstract class, and `StaticDisasterProvider` implementation (returns the 5 seeded Delhi disasters)
+- `DisasterService` remains unchanged — the abstraction is ready for future live sources without modifying existing code or routers
+
+**Key Files:**
+- `backend/app/services/disaster_sources/disaster_provider.py`
+
+### 3.3B.8 Configuration & Environment
+
+**Objective:** Add new settings for background refresh and retention.
+
+**Changes:**
+- Added `NDMA_CAP_RSS_URL`, `REFRESH_INTERVAL_SECONDS` (default 300), `ALERT_RETENTION_DAYS` (default 30), `CACHE_TTL_SECONDS` (default 300) to `settings.py`
+- Updated `.env` and `.env.example` with new variables and renamed NDMA variable
+
+**Key Files:**
+- `backend/app/config/settings.py`
+- `backend/.env`
+- `.env.example`
+
+### 3.3B.9 Documentation
+
+**Objective:** Document Phase 3.3B/C architecture, features, and configuration.
+
+**Changes:**
+- Updated `README.md`: added Phase 3.3B/C feature list, new API endpoints, env var table
+- Updated `docs/PROJECT_CONTEXT.md`: added Phase 3.3B/C to overview, project structure, architecture decisions, database schema, API endpoints, env vars, seed data notes, and features section
+- Updated `docs/CHANGELOG_AI.md`: this entry
+
+**Key Files:**
+- `README.md`
+- `docs/PROJECT_CONTEXT.md`
+- `docs/CHANGELOG_AI.md`
+
+---
+
+## Phase 3.3C — Live OSM Infrastructure Pages
+
+**Objective:** Replace the remaining demo-data-driven pages (Hospitals, Shelters) with live OpenStreetMap data from the location service, matching the Map page behavior exactly.
+
+### 3.3C.1 Hospitals Page Rewrite
+
+**Objective:** Use GPS location + `/api/location/nearby` instead of `/api/hospitals`.
+
+**Changes:**
+- Replaced `hospitalApi.getAll()` import with `useGeolocation` + `locationApi.nearby()` from the shared API layer
+- Page now requires GPS position: if `position` is null, shows `LocationStatus` + "Enable Location" button (never shows demo data)
+- Fetches `NearbyResponse` via `useApi`, extracts `hospitals` array, sorts by distance
+- Each card shows: name, distance badge (m/km), latitude/longitude, OSM tags via `address` field
+- Uses same `NearbyPlace`/`NearbyResponse` types used by MapPage, EmergencyButton, and routing components
+- Visually consistent with existing card design: `Stethoscope` icon, red accent, hover shadow
+
+**Key Files:**
+- `frontend/src/pages/Hospitals.tsx` (rewritten)
+- `frontend/src/types/index.ts` (already had `NearbyPlace`, `NearbyResponse`)
+
+### 3.3C.2 Shelters Page Rewrite
+
+**Objective:** Use GPS location + `/api/location/nearby` instead of `/api/shelters`, merging shelters, community centres, and schools into one sorted list.
+
+**Changes:**
+- Replaced `shelterApi.getAll()` import with `useGeolocation` + `locationApi.nearby()`
+- Merges `shelters`, `community_centres`, and `schools` from `NearbyResponse` into a single `ShelteredPlace[]` with a `category` discriminator
+- Sorts combined list by distance ascending
+- Each card shows: type icon (Home/Users/Building2) with distinct background colors (orange/blue/green), type label via `DESTINATION_LABELS`, distance badge, coordinates, OSM tags
+- GPS gate: same "Enable Location" button when position unavailable
+- Uses shared `NearbyPlace` type — no duplicate interfaces
+
+**Key Files:**
+- `frontend/src/pages/Shelters.tsx` (rewritten)
+
+### 3.3C.3 Legacy API Preservation
+
+**Objective:** Keep `GET /api/hospitals` and `GET /api/shelters` endpoints as fallback/legacy APIs without breaking any consumers.
+
+**Changes:**
+- Backend endpoints untouched — still serve seeded DB records on `GET /api/hospitals` and `GET /api/shelters`
+- `api.ts` service layer retains `hospitalApi.getAll()` and `shelterApi.getAll()` for potential admin use
+- Dashboard still imports both for fallback counters when GPS is unavailable
+- No user-facing page imports `hospitalApi` or `shelterApi` anymore
+
+**Key Files:**
+- `backend/app/routers/hospitals.py` (unchanged)
+- `backend/app/routers/shelters.py` (unchanged)
+- `frontend/src/services/api.ts` (unchanged)
+
+### 3.3C.4 Documentation
+
+**Objective:** Document Phase 3.3C migration in all project docs.
+
+**Changes:**
+- Updated `README.md`: added Phase 3.3C feature list with 5 bullet points
+- Updated `docs/PROJECT_CONTEXT.md`: updated overview sentence, frontend routes table, added Phase 3.3C key features section with 6 bullet points
+- Updated `docs/CHANGELOG_AI.md`: this entry
+
+**Key Files:**
+- `README.md`
+- `docs/PROJECT_CONTEXT.md`
+- `docs/CHANGELOG_AI.md`
+
+---
+
+### Phase 3.3B — LangGraph Shelter Agent (Planned)
+- AI-driven safe destination scoring using disaster type, weather severity, road accessibility, and shelter capacity
+- Dynamic re-scoring based on live CAP alert context
+- Automated shelter assignment during evacuations
+
+### Phase 3.4 — Agentic AI (Planned)
 - LangGraph/CrewAI integration for multi-agent coordination
 - LLM-powered decision support for resource allocation
 - Natural language interface for emergency reporting
 - Predictive analytics for disaster forecasting
-- Automated shelter assignment during evacuations
 - Real-time resource tracking and optimization
 
 ### Architecture Considerations for Phase 3
@@ -799,3 +1086,4 @@ This changelog reconstructs the development history of AIDRAC by analyzing the e
 - `GeolocationState` and `NearestItem` types are agent-consumable
 - `RouteInfo` provider field enables agent awareness of data quality
 - Mock data fallbacks enable AI development without external API dependencies
+- Provider architecture (`disaster_sources/`) enables data source swap without endpoint changes

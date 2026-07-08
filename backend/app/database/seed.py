@@ -2,7 +2,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.shelter import Shelter
 from app.models.hospital import Hospital
 from app.models.disaster import Disaster
-from app.models.alert import Alert
 from app.models.route import Route
 from app.models.user import User
 from app.utils.security import hash_password
@@ -66,21 +65,6 @@ async def seed_database(db: AsyncSession):
         Disaster(type="Fire", severity="critical", latitude=28.6100, longitude=77.2500, description="Major fire in industrial area. Toxic smoke spreading.", status="contained"),
     ]
     db.add_all(disasters)
-    await db.flush()
-
-    alerts = [
-        Alert(title="Evacuation Order: South Delhi", message="Immediate evacuation required for low-lying areas of South Delhi. Proceed to nearest shelter.", disaster_id=1, severity="critical"),
-        Alert(title="Cyclone Warning", message="Cyclone expected to make landfall within 6 hours. Secure belongings and stay indoors.", disaster_id=2, severity="severe"),
-        Alert(title="Aftershock Advisory", message="Aftershocks possible within the next 24 hours. Stay away from damaged buildings.", disaster_id=3, severity="warning"),
-        Alert(title="Road Closures", message="Several roads in flood-affected areas are closed. Check route map for alternatives.", disaster_id=1, severity="warning"),
-        Alert(title="Shelter Capacity Alert", message="City Convention Center shelter is at 60% capacity. Alternative shelters available.", disaster_id=None, severity="info"),
-        Alert(title="Medical Emergency Hotline", message="Emergency medical hotline activated: 1800-123-911. Available 24/7.", disaster_id=None, severity="info"),
-        Alert(title="Water Purification Units", message="Water purification units deployed in flood zones. Collect clean water at designated points.", disaster_id=1, severity="info"),
-        Alert(title="Power Outage Advisory", message="Planned power shutdown in cyclone-affected areas for safety. Restore timeline: 12-24 hours.", disaster_id=2, severity="warning"),
-        Alert(title="Rescue Operations Ongoing", message="NDRF teams deployed for rescue operations. Contact 112 for assistance.", disaster_id=1, severity="info"),
-        Alert(title="Air Quality Warning", message="Air quality severely degraded due to fire. Wear masks if outdoors.", disaster_id=5, severity="warning"),
-    ]
-    db.add_all(alerts)
     await db.flush()
 
     routes = [

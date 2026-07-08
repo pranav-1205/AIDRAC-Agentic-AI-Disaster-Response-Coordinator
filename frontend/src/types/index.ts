@@ -44,6 +44,16 @@ export interface Alert {
   disaster_id?: number;
   severity: string;
   created_at: string;
+  event?: string;
+  external_id?: string;
+  expires_at?: string;
+  expired_at?: string;
+  is_active?: boolean;
+  area?: string;
+  urgency?: string;
+  certainty?: string;
+  polygons?: string;
+  source?: string;
 }
 
 export interface Weather {

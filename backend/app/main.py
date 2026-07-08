@@ -5,6 +5,9 @@ from app.config.settings import settings
 from app.database.connection import engine, Base, async_session_factory
 from app.database.seed import seed_database
 from app.routers import auth, users, shelters, hospitals, disasters, alerts, routes, weather, location, ai
+from app.services.disaster_sources.background_refresh import BackgroundIngestion
+
+_background_ingestion = BackgroundIngestion(async_session_factory)
 
 
 @asynccontextmanager
@@ -14,8 +17,11 @@ async def lifespan(app: FastAPI):
 
     await seed_database(async_session_factory())
 
+    await _background_ingestion.start()
+
     yield
 
+    await _background_ingestion.stop()
     await engine.dispose()
 
 

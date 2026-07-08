@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-2.5-flash"
 
+    IMD_CAP_RSS_URL: str = "https://cap-sources.s3.amazonaws.com/in-imd-en/rss.xml"
+    NDMA_CAP_RSS_URL: str = "https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml"
+
+    REFRESH_INTERVAL_SECONDS: int = 300
+    ALERT_RETENTION_DAYS: int = 30
+    CACHE_TTL_SECONDS: int = 300
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

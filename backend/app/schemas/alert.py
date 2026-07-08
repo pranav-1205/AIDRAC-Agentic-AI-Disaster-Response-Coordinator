@@ -17,6 +17,16 @@ class AlertResponse(BaseModel):
     disaster_id: Optional[int] = None
     severity: str
     created_at: datetime
+    external_id: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    event: Optional[str] = None
+    urgency: Optional[str] = None
+    certainty: Optional[str] = None
+    area: Optional[str] = None
+    is_active: bool = True
+    expired_at: Optional[datetime] = None
+    polygons: Optional[str] = None
+    source: Optional[str] = None
 
     class Config:
         from_attributes = True

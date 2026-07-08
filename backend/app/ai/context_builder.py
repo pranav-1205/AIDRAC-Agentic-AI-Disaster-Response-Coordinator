@@ -87,7 +87,10 @@ class ContextBuilder:
                     parts.append("Active Disasters: none\n")
 
                 result = await session.execute(
-                    select(Alert).order_by(Alert.created_at.desc()).limit(10)
+                    select(Alert)
+                    .where(Alert.external_id.isnot(None))
+                    .order_by(Alert.created_at.desc())
+                    .limit(10)
                 )
                 alerts = result.scalars().all()
                 if alerts:

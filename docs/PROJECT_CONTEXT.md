@@ -4,7 +4,7 @@
 
 **AIDRAC (Agentic AI Disaster Response Coordinator)** is a full-stack disaster management application that helps citizens during natural disasters such as floods, cyclones, and earthquakes. It provides safe evacuation routes, nearby shelters, hospitals, real-time weather information, and emergency alerts through an interactive geographic interface.
 
-The project is architected in phases. Phase 1 established the core platform (auth, database, CRUD APIs, mapping), and Phase 2 added real-time geolocation, routing, and GPS-based weather. Phase 3.1 added live infrastructure from OpenStreetMap (shelters, hospitals, police, fire stations, pharmacies). Phase 3.2 added AI Decision Support via the Gemini API. Phase 3.3+ will introduce Agentic AI orchestration.
+The project is architected in phases. Phase 1 established the core platform (auth, database, CRUD APIs, mapping), and Phase 2 added real-time geolocation, routing, and GPS-based weather. Phase 3.1 added live infrastructure from OpenStreetMap (shelters, hospitals, police, fire stations, pharmacies). Phase 3.2 added AI Decision Support via the Gemini API. Phase 3.3A added live CAP alert ingestion from official IMD/NDMA feeds. Phase 3.3B/C added background ingestion, multi-source merging, alert history, caching, location-aware filtering, and disaster provider abstraction. Phase 3.3C migrated the Hospitals and Shelters pages from demo database records to live OpenStreetMap data. Phase 3.3+ will introduce Agentic AI orchestration.
 
 ---
 
@@ -97,15 +97,24 @@ aidrac/
 │       │   ├── shelters.py  # CRUD /api/shelters
 │       │   ├── hospitals.py # GET/POST /api/hospitals
 │       │   ├── disasters.py # GET/POST /api/disasters, /api/disasters/active
-│       │   ├── alerts.py    # GET/POST /api/alerts
+│       │   ├── alerts.py    # GET/POST /api/alerts, GET /api/alerts/history
 │       │   ├── routes.py    # GET/POST /api/routes
 │       │   └── weather.py   # GET /api/weather?lat=&lng=
 │       ├── services/        # Business logic layer
+│       │   ├── disaster_sources/ # Provider architecture (Phase 3.3A + 3.3B/C)
+│       │   │   ├── base.py              # Abstract providers + data classes
+│       │   │   ├── cap_provider.py      # IMD/NDMA CAP RSS parser + cache + multi-source merge
+│       │   │   ├── openweather_provider.py # OpenWeather wrapper
+│       │   │   ├── normalizer.py        # Provider → DB schema conversion
+│       │   │   ├── cache.py             # In-memory TTL cache for RSS/CAP XML
+│       │   │   ├── background_refresh.py# Async background ingestion loop (5-min interval)
+│       │   │   ├── disaster_provider.py # DisasterProvider abstraction + static fallback
+│       │   │   └── ingestion_service.py # Manual trigger orchestration + soft-expire
 │       │   ├── auth.py      # Register/login with hashing
 │       │   ├── shelter.py   # CRUD with 404 handling
 │       │   ├── hospital.py  # Read/create
 │       │   ├── disaster.py  # List active, ordered by date
-│       │   ├── alert.py     # List with optional disaster join
+│       │   ├── alert.py     # List with expiry filtering
 │       │   └── weather.py   # OpenWeatherMap API + mock fallback
 │       └── utils/
 │           ├── security.py  # bcrypt hashing, JWT create/decode
@@ -175,11 +184,17 @@ aidrac/
 
 3. **Async Everything**: SQLAlchemy's async engine (`create_async_engine`) with `asyncpg` driver. All route handlers and service methods are `async def`.
 
-4. **Lifespan Auto-Migration**: Tables are created on startup via `Base.metadata.create_all` inside the FastAPI lifespan. Seed data is applied immediately after. No separate migration step needed for development.
+4. **Lifespan Auto-Migration**: Tables are created on startup via `Base.metadata.create_all` inside the FastAPI lifespan. Seed data is applied immediately after. Background alert ingestion starts on lifespan begin and runs every 5 minutes. No separate migration step needed for development.
 
-5. **JWT Auth**: Access tokens contain `sub` (user ID) and `role` claims. Token extraction via `HTTPBearer`. Admin routes protected by `require_admin` dependency.
+5. **Background Ingestion**: IMD and NDMA CAP RSS feeds are fetched concurrently on a 5-minute asyncio loop. Raw RSS and parsed CAP XML are cached in-memory with TTL. `GET /api/alerts` reads only from PostgreSQL — no network requests on reads.
 
-6. **Mock Fallback**: The weather service returns mock data when no API key is configured, enabling full local development without external dependencies.
+6. **Alert History**: Expired alerts are soft-deleted (`is_active=false`, `expired_at=now`) instead of physically removed. A configurable retention purge (default 30 days) removes truly stale records. The `/api/alerts/history` endpoint exposes inactive alerts.
+
+7. **Location-Aware Filtering**: `GET /api/alerts` accepts optional `lat`/`lng` query params. A bounding-box-based state resolver maps coordinates to Indian states, then matches against CAP `area` fields. Designed so polygon-based GeoJSON filtering can replace it without API changes.
+
+8. **JWT Auth**: Access tokens contain `sub` (user ID) and `role` claims. Token extraction via `HTTPBearer`. Admin routes protected by `require_admin` dependency.
+
+9. **Mock Fallback**: The weather service returns mock data when no API key is configured, enabling full local development without external dependencies.
 
 ### Frontend Architecture
 
@@ -248,10 +263,20 @@ aidrac/
 |--------|------|-------------|
 | id | Integer | PK, indexed |
 | title | String(255) | NOT NULL |
-| message | String(2000) | NOT NULL |
+| message | Text | NOT NULL |
 | disaster_id | Integer | FK -> disasters.id, nullable |
 | severity | String(50) | default 'info' |
 | created_at | DateTime(tz) | server_default now() |
+| external_id | String(255) | UNIQUE, nullable (CAP identifier) |
+| expires_at | DateTime(tz) | nullable |
+| event | String(255) | nullable |
+| urgency | String(50) | nullable |
+| certainty | String(50) | nullable |
+| area | String(500) | nullable |
+| is_active | Boolean | default True, NOT NULL |
+| expired_at | DateTime(tz) | nullable |
+| polygons | Text | nullable (semicolon-joined polygon strings) |
+| source | String(50) | nullable (e.g., "imd", "ndma") |
 
 ### `routes`
 | Column | Type | Constraints |
@@ -283,8 +308,9 @@ aidrac/
 | GET | `/api/disasters` | None | List all disasters |
 | GET | `/api/disasters/active` | None | List active disasters |
 | POST | `/api/disasters` | Admin | Create disaster |
-| GET | `/api/alerts` | None | List all alerts |
+| GET | `/api/alerts` | None | List active alerts (optional `?lat=&lng=` for location filtering) |
 | POST | `/api/alerts` | Admin | Create alert |
+| GET | `/api/alerts/history` | None | List expired/deactivated alerts |
 | GET | `/api/routes` | None | List evacuation routes |
 | POST | `/api/routes` | None | Create route |
 | GET | `/api/health` | None | Health check |
@@ -300,8 +326,8 @@ aidrac/
 | `/register` | Register | Public | Redirects to /dashboard if authenticated |
 | `/dashboard` | Dashboard | Required | Weather, alerts, disaster table |
 | `/map` | MapPage | Required | Lazy-loaded interactive map |
-| `/shelters` | Shelters | Required | Shelter directory with occupancy bars |
-| `/hospitals` | Hospitals | Required | Hospital directory with emergency status |
+| `/shelters` | Shelters | Required | Live OSM shelters, community centres, and schools sorted by distance |
+| `/hospitals` | Hospitals | Required | Live OSM hospitals sorted by distance with OSM tags |
 | `/alerts` | AlertsPage | Required | Severity-filtered alert feed |
 | `/admin` | Admin | Admin only | Statistics overview |
 | `*` | NotFound | None | 404 page |
@@ -356,6 +382,36 @@ aidrac/
 - **Graceful Fallback**: when `GEMINI_API_KEY` is unset, returns an informative message instead of crashing
 - **Error Resilience**: Gemini call failures are caught and return a user-friendly fallback response with suggested next actions
 
+### Phase 3.3A — Live CAP Alert Ingestion
+- **Provider Architecture**: `backend/app/services/disaster_sources/` with abstract `WeatherProvider`/`AlertProvider` interfaces — the rest of the application does not know where data originates
+- **CAP RSS Ingestion**: fetches official India alerts from IMD and NDMA CAP RSS feeds concurrently
+- **CAP XML Parsing**: extracts event, headline, description, severity (normalized to critical/warning/advisory/info), urgency, certainty, effective/expires times, area description, and polygon coordinates
+- **Deduplication**: alerts keyed by CAP `identifier` (stored as `external_id` with unique constraint); existing alerts updated on re-ingestion
+- **Auto-Expiry**: alerts with `expires_at` in the past are soft-deleted (`is_active=false`) instead of removed
+- **Alert Model Extended**: added `external_id`, `expires_at`, `event`, `urgency`, `certainty`, `area`, `is_active`, `expired_at`, `polygons`, `source` columns; `message` widened to `Text` for long CAP descriptions
+- **IngestionService**: orchestrates fetch → normalize → upsert → soft-expire
+- **Backward Compatible**: existing `AlertService.get_all()` and `get_active()` filter out inactive and expired alerts; `POST /api/alerts` unchanged; ContextBuilder filters to CAP-only alerts
+- **Error Resilience**: both feeds attempted concurrently; if both fail → empty alerts returned; never crashes
+- **Weather Unchanged**: `GET /api/weather` continues using existing `WeatherService`; `OpenWeatherProvider` wrapper available for future use
+
+### Phase 3.3B/C — Background Ingestion & Alert Pipeline
+- **Background Refresh**: IMD and NDMA feeds fetched concurrently every 5 minutes via asyncio background task started in FastAPI lifespan. `GET /api/alerts` reads only from PostgreSQL — zero network requests on reads.
+- **Multi-Source Merge**: IMD and NDMA treated as equal peers. Results merged into a single list, deduplicated by `external_id`. CAP XML files downloaded concurrently within each feed.
+- **Alert History & Soft-Delete**: Expired alerts set `is_active=false` and `expired_at=now` instead of being deleted. A configurable retention purge (default 30 days) physically removes stale records. New `/api/alerts/history` endpoint returns deactivated alerts.
+- **In-Memory Caching**: RSS XML and parsed CAP XML are cached via `CacheService` with 5-minute TTL. On network failure, the most recent successful data is served from cache.
+- **Location-Aware Filtering**: `GET /api/alerts` accepts optional `?lat=` and `?lng=` query parameters. A state-resolver maps coordinates to Indian states via bounding boxes. Alerts matching the user's state (by `area` field substring), plus nationwide alerts, are returned. Designed for future polygon-based filtering without API changes.
+- **DisasterProvider Abstraction**: `DisasterProvider` abstract interface with `StaticDisasterProvider` for seeded development data. Ready for live disaster API sources without changing consumers.
+- **Demo Data Cleanup**: seed.py no longer creates demo alerts. Existing demo alerts from earlier runs are marked inactive on first background refresh. ContextBuilder filters to alerts with `external_id IS NOT NULL`.
+
+### Phase 3.3C — Live OSM Infrastructure Pages
+- **Hospitals Page Rewritten** — `/hospitals` uses `useGeolocation` + `locationApi.nearby()` to display live nearby hospitals from OpenStreetMap, sorted by distance, with distance badge, coordinates, and OSM tags shown on each card
+- **Shelters Page Rewritten** — `/shelters` merges `shelters`, `community_centres`, and `schools` from the location service into one sorted-by-distance list, each card showing a type label (Safe Shelter / Community Centre / School) with distinct icons and colors
+- **GPS Location Gate** — both pages require GPS; if unavailable, they show a "Enable Location" button and the `LocationStatus` indicator, never falling back to demo data
+- **Legacy Endpoints Deprecated for Pages** — `GET /api/hospitals` and `GET /api/shelters` remain available as fallback APIs but are no longer used by any user-facing page. The Dashboard still references them for fallback counters when GPS is unavailable.
+- **Type Consistency** — uses `NearbyPlace`/`NearbyResponse` types shared with MapPage, EmergencyButton, and AI ContextBuilder — no duplicate models
+- **Error Handling** — Overpass unavailability shows a user-friendly error with retry button via `ErrorState` component
+- **Zero Demo Data** — no seeded hospitals or shelters appear on either page; data comes exclusively from OpenStreetMap
+
 ### Phase 2 — Real-Time Geolocation & Navigation
 - **Browser GPS** via `navigator.geolocation.watchPosition` with continuous tracking
 - **Nearest Shelter Detection** using Haversine distance formula
@@ -386,6 +442,10 @@ aidrac/
 | `OPENWEATHER_API_KEY` | No | empty | Backend | OpenWeather API key (mock fallback if empty) |
 | `VITE_ORS_API_KEY` | No | empty | Frontend | OpenRouteService API key (OSRM fallback if empty) |
 | `OVERPASS_API_URL` | No | `https://overpass-api.de/api/interpreter` | Backend | Overpass API endpoint (defaults to public instance) |
+| `IMD_CAP_RSS_URL` | No | `https://cap-sources.s3.amazonaws.com/in-imd-en/rss.xml` | Backend | Primary IMD CAP RSS feed (Phase 3.3A) |
+| `NDMA_CAP_RSS_URL` | No | `https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml` | Backend | Secondary NDMA CAP RSS feed, fetched concurrently with IMD (Phase 3.3B/C) |
+| `REFRESH_INTERVAL_SECONDS` | No | `300` | Backend | Background alert refresh interval (Phase 3.3B/C) |
+| `ALERT_RETENTION_DAYS` | No | `30` | Backend | Days before physically deleting expired alerts (Phase 3.3B/C) |
 
 ---
 
@@ -403,8 +463,9 @@ The database auto-seeds on first startup with:
 - 10 shelters in the New Delhi area
 - 10 hospitals in the New Delhi area
 - 5 disaster events (floods, cyclone, earthquake, fire)
-- 10 emergency alerts (linked to disasters or standalone)
 - 3 pre-defined evacuation routes
+
+*Note: Alerts are no longer seeded — they come exclusively from live CAP feeds via the background ingestion service. Demo alerts (without `external_id`) are marked inactive on the first background refresh run.*
 
 ---
 
@@ -448,5 +509,6 @@ The architecture is designed for extension with Agentic AI in Phase 3.3+:
 - **Predictive analytics** for disaster forecasting
 - **Multi-agent coordination** for dynamic shelter assignment and evacuation planning
 - **Natural language interface** for emergency reporting and inquiry
+- **Polygon-based alert filtering** replacing the current area/state string matching strategy
 
 The existing service layer, typed API schemas, and modular component structure are intentionally designed to be consumed by AI agents without architectural changes.
