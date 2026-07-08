@@ -69,6 +69,8 @@ export const weatherApi = {
 export const locationApi = {
   nearby: (lat: number, lng: number, radius?: number) =>
     api.get('/location/nearby', { params: { lat, lng, radius: radius ?? 10_000 } }),
+  safeDestination: (lat: number, lng: number, radius?: number) =>
+    api.get('/location/safe-destination', { params: { lat, lng, radius: radius ?? 10_000 } }),
 };
 
 export const aiApi = {

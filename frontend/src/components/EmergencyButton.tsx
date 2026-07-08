@@ -27,15 +27,6 @@ const DEST_COLORS: Record<EmergencyDestinationType, string> = {
   pharmacy: 'bg-emerald-600 hover:bg-emerald-700',
 };
 
-const SAFE_SHELTER_PRIORITY: { type: EmergencyDestinationType; category: keyof NearbyResponse }[] = [
-  { type: 'shelter', category: 'shelters' },
-  { type: 'community_centre', category: 'community_centres' },
-  { type: 'school', category: 'schools' },
-  { type: 'hospital', category: 'hospitals' },
-  { type: 'police', category: 'police' },
-  { type: 'firestation', category: 'firestations' },
-];
-
 function getCategory(dest: EmergencyDestinationType): keyof NearbyResponse {
   switch (dest) {
     case 'shelter': return 'shelters';
@@ -70,23 +61,20 @@ export default function EmergencyButton() {
     if (!position) return;
     setCalculating('shelter');
     try {
-      const nearby = await locationApi.nearby(position.lat, position.lng);
-      for (const entry of SAFE_SHELTER_PRIORITY) {
-        const items: NearbyPlace[] = nearby.data[entry.category];
-        if (items.length > 0) {
-          const nearest = findNearest(items, position.lat, position.lng);
-          navigate('/map', {
-            state: {
-              emergencyRoute: true,
-              destinationType: entry.type,
-              destinationItem: nearest,
-              userPosition: position,
-            },
-          });
-          return;
-        }
+      const resp = await locationApi.safeDestination(position.lat, position.lng);
+      const { destinationType, destination } = resp.data;
+      if (!destinationType || !destination) {
+        showError('No safe destination found nearby.');
+        return;
       }
-      showError('No safe destination found nearby.');
+      navigate('/map', {
+        state: {
+          emergencyRoute: true,
+          destinationType,
+          destinationItem: { item: destination, distanceKm: destination.distance },
+          userPosition: position,
+        },
+      });
     } finally {
       setCalculating(null);
     }
