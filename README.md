@@ -28,6 +28,11 @@ A full-stack disaster management application that helps citizens during natural 
 aidrac/
 ├── backend/
 │   ├── app/
+│   │   ├── ai/               # AI Decision Support (Gemini)
+│   │   │   ├── prompts.py        # System prompt
+│   │   │   ├── context_builder.py# Context collection & normalization
+│   │   │   ├── ai_service.py     # Gemini client & response parsing
+│   │   │   └── schemas.py        # Request/response Pydantic models
 │   │   ├── config/          # Application settings
 │   │   ├── database/        # DB connection & seed data
 │   │   ├── models/          # SQLAlchemy models
@@ -88,6 +93,14 @@ aidrac/
 - **In-Memory TTL Cache** — 10-minute cache for Overpass results with stale-cache fallback
 - **Parallel Category Fetching** — all 5 infrastructure categories queried simultaneously
 
+### Phase 3.2 (Complete)
+- **AI Decision Support** — Gemini-powered emergency recommendations
+- **Backend AI Package** — isolated AI module with prompts, context builder, and Gemini client
+- **Context Enrichment** — automatically gathers GPS, weather, nearby infrastructure, disasters, and alerts before querying Gemini
+- **Structured JSON Responses** — risk level, summary, recommended destination, reasoning, and actionable steps
+- **Dashboard AI Assistant** — question input with formatted recommendation cards
+- **Placeholder System Prompt** — easily replaceable without touching other code
+
 ## API Endpoints
 
 | Method | Endpoint | Description |
@@ -109,6 +122,7 @@ aidrac/
 | POST | `/api/alerts` | Create alert (admin) |
 | GET | `/api/routes` | List evacuation routes |
 | POST | `/api/routes` | Create route |
+| POST | `/api/ai/recommendation` | AI emergency recommendation (question, optional lat/lng) |
 
 ## Setup Instructions
 
@@ -176,13 +190,15 @@ docker-compose up --build
 | `SECRET_KEY` | Yes | JWT signing secret |
 | `OPENWEATHER_API_KEY` | No | OpenWeather API key (mock data used if empty) |
 | `OVERPASS_API_URL` | No | Primary Overpass API endpoint (defaults to openstreetmap.fr, falls back to overpass-api.de, kumi.systems) |
+| `GEMINI_API_KEY` | No | Google Gemini API key (AI recommendations disabled if not set) |
+| `GEMINI_MODEL` | No | Gemini model name (default: `gemini-2.5-flash`) |
 | `VITE_ORS_API_KEY` | No | OpenRouteService API key (OSRM fallback if empty) |
 
 ### Demo Credentials
 - **Admin:** admin@aidrac.com / admin123
 - **User:** user@aidrac.com / user123
 
-## Phase 3.2+ Roadmap
+## Phase 3.3+ Roadmap
 - Agentic AI integration (LangGraph/CrewAI)
 - Autonomous disaster response coordination
 - LLM-powered decision support

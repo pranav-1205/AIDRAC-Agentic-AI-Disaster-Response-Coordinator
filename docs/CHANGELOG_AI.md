@@ -702,9 +702,90 @@ This changelog reconstructs the development history of AIDRAC by analyzing the e
 
 ---
 
+## Phase 3.2 — AI Decision Support (Gemini)
+
+### 3.2.1 AI Package & Service Layer
+
+**Objective:** Implement an AI Decision Support layer using the Gemini API, isolated in its own backend package.
+
+**Changes:**
+- Created `backend/app/ai/` package with 4 modules:
+  - **`prompts.py`**: single `SYSTEM_PROMPT` constant (placeholder text). Designed to be replaced without touching any other code.
+  - **`schemas.py`**: `AIRecommendationRequest` (question + optional lat/lng) and `AIRecommendationResponse` (riskLevel, summary, recommendedDestination, reason, actions) Pydantic models.
+  - **`context_builder.py`**: `ContextBuilder` class that collects and normalizes: GPS location, weather (via `WeatherService`), nearby infrastructure (all 7 OSM categories via `LocationService`), active disasters, and recent alerts (via DB session). Returns a plain text context string for the prompt.
+  - **`ai_service.py`**: `AIService` class wrapping the `google.genai` SDK. Assembles system prompt + context + question into a single prompt. Calls Gemini 2.0 Flash asynchronously. Parses JSON response with markdown fence stripping. Full error handling — returns a structured fallback response on failure or when `GEMINI_API_KEY` is unset.
+- Registered `GEMINI_API_KEY` in `settings.py` (optional, defaults to `None`).
+- Added `google-genai>=1.0.0` to `requirements.txt`.
+- Updated `.env.example` with `GEMINI_API_KEY=`.
+
+**Key Files:**
+- `backend/app/ai/__init__.py`
+- `backend/app/ai/prompts.py`
+- `backend/app/ai/schemas.py`
+- `backend/app/ai/context_builder.py`
+- `backend/app/ai/ai_service.py`
+- `backend/app/config/settings.py`
+- `backend/requirements.txt`
+- `.env.example`
+
+**Architecture Decision:** The AI package is fully isolated — it imports only from `app.services`, `app.models`, and `app.config`. The system prompt is a module-level constant so it can be replaced in one place. The `ContextBuilder` instantiates its own service dependencies, keeping the AI layer self-contained. The `AIService` returns a fallback response when the API key is missing, avoiding crashes in development/demo mode.
+
+---
+
+### 3.2.2 AI Router
+
+**Objective:** Expose the AI recommendation engine via a REST endpoint.
+
+**Changes:**
+- Created `backend/app/routers/ai.py` with `POST /api/ai/recommendation`
+  - Accepts `AIRecommendationRequest` (question required, lat/lng optional)
+  - Instantiates `ContextBuilder` and `AIService` at module level (single instances)
+  - Calls `context_builder.build()` to generate context, then `ai_service.get_recommendation()` to get the AI response
+  - Returns the response as a dict via `model_dump()`
+- Wired into `main.py` via `app.include_router(ai.router)`
+
+**Key Files:**
+- `backend/app/routers/ai.py`
+- `backend/app/main.py`
+
+**Architecture Decision:** Module-level service instances (same pattern as `location.py`) preserve state across requests. The router is stateless beyond the service instances — all enrichment and AI logic lives in the `ai/` package.
+
+---
+
+### 3.2.3 AIAssistant Frontend Component
+
+**Objective:** Create a user-facing AI interaction component with question input and formatted responses.
+
+**Changes:**
+- Created `frontend/src/components/AIAssistant.tsx`:
+  - Question input field with keyboard submit (Enter key)
+  - Send button with loading spinner
+  - Error banner for API failures
+  - Formatted recommendation card showing:
+    - Risk level badge (color-coded: low/green, moderate/yellow, high/orange, critical/red)
+    - Summary paragraph
+    - Recommended destination card (blue highlight with type label)
+    - Reasoning text (italic, subtle)
+    - Numbered action list with styled circles
+  - Gets GPS position via `useGeolocation` hook and passes lat/lng to the API
+  - Gracefully handles null destination (skips destination card)
+- Added `AIRecommendationRequest` and `AIRecommendationResponse` types to `frontend/src/types/index.ts`
+- Added `aiApi.recommend()` method to `frontend/src/services/api.ts`
+- Integrated `AIAssistant` into the Dashboard page (below the active disasters table)
+
+**Key Files:**
+- `frontend/src/components/AIAssistant.tsx`
+- `frontend/src/types/index.ts`
+- `frontend/src/services/api.ts`
+- `frontend/src/pages/Dashboard.tsx`
+
+**Architecture Decision:** The AIAssistant is a self-contained component with its own state management (loading, error, result). It uses the existing `useGeolocation` hook to provide location context. The Dashboard integration is a single `<AIAssistant />` JSX tag — no shared state, no coupling.
+
+---
+
 ## Future Phases
 
-### Phase 3 — Agentic AI (Planned)
+### Phase 3.3 — Agentic AI (Planned)
 - LangGraph/CrewAI integration for multi-agent coordination
 - LLM-powered decision support for resource allocation
 - Natural language interface for emergency reporting

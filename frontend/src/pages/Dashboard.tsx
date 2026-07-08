@@ -3,6 +3,7 @@ import DashboardCard from '../components/DashboardCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorState from '../components/ErrorState';
 import LocationStatus from '../components/LocationStatus';
+import AIAssistant from '../components/AIAssistant';
 import { useApi } from '../hooks/useApi';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useWeather } from '../hooks/useWeather';
@@ -190,11 +191,13 @@ export default function Dashboard() {
                 ))}
               </tbody>
             </table>
-          </div>
-        ) : (
-          <p className="text-gray-400 text-sm">No active disasters</p>
-        )}
+        </div>
+      ) : (
+        <p className="text-gray-400 text-sm">No active disasters</p>
+      )}
       </div>
+
+      <AIAssistant />
     </div>
   );
 }

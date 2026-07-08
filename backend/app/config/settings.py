@@ -14,6 +14,8 @@ class Settings(BaseSettings):
 
     OPENWEATHER_API_KEY: Optional[str] = None
     OVERPASS_API_URL: str = "https://overpass.openstreetmap.fr/api/interpreter"
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.5-flash"
 
     class Config:
         env_file = ".env"

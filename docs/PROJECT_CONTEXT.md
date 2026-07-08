@@ -4,7 +4,7 @@
 
 **AIDRAC (Agentic AI Disaster Response Coordinator)** is a full-stack disaster management application that helps citizens during natural disasters such as floods, cyclones, and earthquakes. It provides safe evacuation routes, nearby shelters, hospitals, real-time weather information, and emergency alerts through an interactive geographic interface.
 
-The project is architected in phases. Phase 1 established the core platform (auth, database, CRUD APIs, mapping), and Phase 2 added real-time geolocation, routing, and GPS-based weather. Phase 3.1 added live infrastructure from OpenStreetMap (shelters, hospitals, police, fire stations, pharmacies). Phase 3.2+ will introduce Agentic AI orchestration.
+The project is architected in phases. Phase 1 established the core platform (auth, database, CRUD APIs, mapping), and Phase 2 added real-time geolocation, routing, and GPS-based weather. Phase 3.1 added live infrastructure from OpenStreetMap (shelters, hospitals, police, fire stations, pharmacies). Phase 3.2 added AI Decision Support via the Gemini API. Phase 3.3+ will introduce Agentic AI orchestration.
 
 ---
 
@@ -344,6 +344,18 @@ aidrac/
 - **No Cross-Border Routing**: removed DB fallback for routing when GPS is active; routes are computed exclusively from live Overpass results
 - **Retry Logic for Overpass**: each endpoint tried once; success logged; all fail → OverpassError raised
 
+### Phase 3.2 — AI Decision Support (Gemini)
+- **Isolated AI Package**: `backend/app/ai/` containing `prompts.py`, `context_builder.py`, `ai_service.py`, and `schemas.py` — modular, replaceable, no coupling to other services
+- **Placeholder System Prompt**: `SYSTEM_PROMPT` constant in `prompts.py` can be swapped without touching any other code
+- **Context Builder**: collects GPS location, weather, nearby infrastructure (all 7 OSM categories), active disasters, and recent alerts; normalizes into a structured prompt context
+- **Gemini API Integration**: uses `google.genai` SDK with configurable model (default `gemini-2.5-flash`); async client for non-blocking requests; fallback response when API key is missing or call fails
+- **Structured JSON Response**: returns `riskLevel`, `summary`, `recommendedDestination` (type + name), `reason`, and `actions[]`
+- **New Endpoint**: `POST /api/ai/recommendation` accepts `{ question, lat?, lng? }` and returns enriched AI recommendation
+- **AIAssistant Component**: `frontend/src/components/AIAssistant.tsx` with question input, send button, loading state, error handling, and formatted recommendation card
+- **Dashboard Integration**: AI Assistant card embedded in the Dashboard page below active disasters
+- **Graceful Fallback**: when `GEMINI_API_KEY` is unset, returns an informative message instead of crashing
+- **Error Resilience**: Gemini call failures are caught and return a user-friendly fallback response with suggested next actions
+
 ### Phase 2 — Real-Time Geolocation & Navigation
 - **Browser GPS** via `navigator.geolocation.watchPosition` with continuous tracking
 - **Nearest Shelter Detection** using Haversine distance formula
@@ -427,9 +439,9 @@ docker-compose up --build
 
 ---
 
-## Phase 3.2+ Roadmap
+## Phase 3.3+ Roadmap
 
-The architecture is designed for extension with Agentic AI in Phase 3:
+The architecture is designed for extension with Agentic AI in Phase 3.3+:
 
 - **LangGraph/CrewAI integration** for autonomous disaster response coordination
 - **LLM-powered decision support** for resource allocation

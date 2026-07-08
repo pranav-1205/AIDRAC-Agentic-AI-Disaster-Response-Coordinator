@@ -71,6 +71,11 @@ export const locationApi = {
     api.get('/location/nearby', { params: { lat, lng, radius: radius ?? 10_000 } }),
 };
 
+export const aiApi = {
+  recommend: (data: { question: string; lat?: number; lng?: number }) =>
+    api.post('/ai/recommendation', data),
+};
+
 export const routingApi = {
   ors: (start: [number, number], end: [number, number], apiKey: string) => {
     const body = {

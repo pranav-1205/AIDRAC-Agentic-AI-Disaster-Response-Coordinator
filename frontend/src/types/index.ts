@@ -120,3 +120,17 @@ export interface NearbyResponse {
   firestations: NearbyPlace[];
   pharmacies: NearbyPlace[];
 }
+
+export interface AIRecommendationRequest {
+  question: string;
+  lat?: number;
+  lng?: number;
+}
+
+export interface AIRecommendationResponse {
+  riskLevel: string;
+  summary: string;
+  recommendedDestination: { type: string; name: string } | null;
+  reason: string;
+  actions: string[];
+}
