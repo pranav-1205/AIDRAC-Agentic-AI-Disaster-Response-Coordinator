@@ -8,7 +8,9 @@ CACHE_TTL = 600
 
 CATEGORY_QUERIES: dict[str, list[str]] = {
     "hospitals": ["amenity=hospital"],
-    "shelters": ["amenity=shelter", "building=shelter", "emergency=shelter", "amenity=community_centre"],
+    "shelters": ["amenity=shelter", "building=shelter", "emergency=shelter"],
+    "community_centres": ["amenity=community_centre"],
+    "schools": ["amenity=school"],
     "police": ["amenity=police"],
     "firestations": ["amenity=fire_station"],
     "pharmacies": ["amenity=pharmacy"],
@@ -43,6 +45,12 @@ class LocationService:
 
     async def get_nearby_shelters(self, lat: float, lng: float, radius: int = DEFAULT_RADIUS) -> list[dict[str, Any]]:
         return await self._fetch("shelters", lat, lng, radius)
+
+    async def get_nearby_community_centres(self, lat: float, lng: float, radius: int = DEFAULT_RADIUS) -> list[dict[str, Any]]:
+        return await self._fetch("community_centres", lat, lng, radius)
+
+    async def get_nearby_schools(self, lat: float, lng: float, radius: int = DEFAULT_RADIUS) -> list[dict[str, Any]]:
+        return await self._fetch("schools", lat, lng, radius)
 
     async def get_nearby_police(self, lat: float, lng: float, radius: int = DEFAULT_RADIUS) -> list[dict[str, Any]]:
         return await self._fetch("police", lat, lng, radius)

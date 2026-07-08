@@ -92,6 +92,16 @@ export interface RouteInfo {
 }
 
 export type NearbyCategory = 'hospital' | 'shelter' | 'police' | 'firestation' | 'pharmacy';
+export type EmergencyDestinationType = 'shelter' | 'community_centre' | 'school' | 'hospital' | 'police' | 'firestation' | 'pharmacy';
+export const DESTINATION_LABELS: Record<EmergencyDestinationType, string> = {
+  shelter: 'Safe Shelter',
+  community_centre: 'Community Centre',
+  school: 'School',
+  hospital: 'Hospital',
+  police: 'Police Station',
+  firestation: 'Fire Station',
+  pharmacy: 'Pharmacy',
+};
 
 export interface NearbyPlace {
   name: string;
@@ -104,6 +114,8 @@ export interface NearbyPlace {
 export interface NearbyResponse {
   hospitals: NearbyPlace[];
   shelters: NearbyPlace[];
+  community_centres: NearbyPlace[];
+  schools: NearbyPlace[];
   police: NearbyPlace[];
   firestations: NearbyPlace[];
   pharmacies: NearbyPlace[];

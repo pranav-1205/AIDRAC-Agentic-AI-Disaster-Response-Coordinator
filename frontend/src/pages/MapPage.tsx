@@ -9,8 +9,9 @@ import { findNearest, sortByDistance } from '../utils/haversine';
 import { getRoute } from '../utils/routing';
 import type {
   Shelter, Hospital, Disaster, RouteInfo, NearestItem, GeoPosition,
-  NearbyPlace, NearbyResponse,
+  NearbyPlace, NearbyResponse, EmergencyDestinationType,
 } from '../types';
+import { DESTINATION_LABELS } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
 import LocationStatus from '../components/LocationStatus';
 import RoutePanel from '../components/RoutePanel';
@@ -65,12 +66,25 @@ const disasterIcon = L.divIcon({
   iconAnchor: [16, 16],
 });
 
-const nearestShelterIcon = L.divIcon({
-  className: 'custom-marker',
-  html: '<div style="background:#15803d;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:3px solid #86efac;box-shadow:0 2px 8px rgba(0,0,0,0.4);font-size:18px;">🏠</div>',
-  iconSize: [36, 36],
-  iconAnchor: [18, 18],
-});
+const DEST_ICON_CONFIG: Record<EmergencyDestinationType, { bg: string; border: string; emoji: string }> = {
+  shelter: { bg: '#f97316', border: '#fed7aa', emoji: '🏠' },
+  community_centre: { bg: '#0d9488', border: '#ccfbf1', emoji: '👥' },
+  school: { bg: '#ca8a04', border: '#fef9c3', emoji: '📚' },
+  hospital: { bg: '#dc2626', border: '#fca5a5', emoji: '❤️' },
+  police: { bg: '#1d4ed8', border: '#bfdbfe', emoji: '👮' },
+  firestation: { bg: '#b91c1c', border: '#fecaca', emoji: '🔥' },
+  pharmacy: { bg: '#059669', border: '#a7f3d0', emoji: '💊' },
+};
+
+function getDestinationIcon(type: EmergencyDestinationType): L.DivIcon {
+  const cfg = DEST_ICON_CONFIG[type];
+  return L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="background:${cfg.bg};color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:3px solid ${cfg.border};box-shadow:0 2px 8px rgba(0,0,0,0.4);font-size:18px;">${cfg.emoji}</div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  });
+}
 
 function severityRadius(severity: string): number {
   switch (severity) {
@@ -124,8 +138,8 @@ export default function MapPage() {
   const navState = location.state as {
     emergencyRoute?: boolean;
     userPosition?: GeoPosition;
-    nearestShelter?: NearestItem<NearbyPlace>;
-    nearestHospital?: NearestItem<NearbyPlace>;
+    destinationType?: EmergencyDestinationType;
+    destinationItem?: NearestItem<NearbyPlace>;
   } | null;
 
   const geolocation = useGeolocation({ watch: true });
@@ -179,18 +193,8 @@ export default function MapPage() {
     }));
   }, [liveHospitals, dbHospitals, hasGps, overpassLoaded]);
 
-  const computedNearestShelter = useMemo(
-    () => (allShelters.length > 0 && position ? findNearest(allShelters, position.lat, position.lng) : null),
-    [allShelters, position]
-  );
-
-  const computedNearestHospital = useMemo(
-    () => (allHospitals.length > 0 && position ? findNearest(allHospitals, position.lat, position.lng) : null),
-    [allHospitals, position]
-  );
-
-  const nearestShelter = navState?.nearestShelter ?? computedNearestShelter;
-  const nearestHospital = navState?.nearestHospital ?? computedNearestHospital;
+  const destinationType: EmergencyDestinationType | null = navState?.destinationType ?? null;
+  const destination: NearestItem<NearbyPlace> | null = navState?.destinationItem ?? null;
 
   const sortedShelters = useMemo(
     () => (allShelters.length > 0 && position ? sortByDistance(allShelters, position.lat, position.lng).slice(0, 5) : []),
@@ -203,24 +207,24 @@ export default function MapPage() {
   );
 
   const fetchRoute = useCallback(async () => {
-    if (!position || !nearestShelter) return;
+    if (!position || !destination) return;
     setRouteLoading(true);
     try {
       const routeData = await getRoute(
         [position.lat, position.lng],
-        [nearestShelter.item.latitude, nearestShelter.item.longitude]
+        [destination.item.latitude, destination.item.longitude]
       );
       setRoute(routeData);
     } finally {
       setRouteLoading(false);
     }
-  }, [position, nearestShelter]);
+  }, [position, destination]);
 
   useEffect(() => {
-    if (showRoutePanel && position && nearestShelter) {
+    if (showRoutePanel && position && destination) {
       fetchRoute();
     }
-  }, [showRoutePanel, position, nearestShelter, fetchRoute]);
+  }, [showRoutePanel, position, destination, fetchRoute]);
 
   useEffect(() => { if (position) refetchNearby(); }, [position?.lat, position?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -290,19 +294,21 @@ export default function MapPage() {
               <Popup><div className="text-sm font-medium">You are here</div></Popup>
             </Marker>
 
-            {/* Nearest shelter highlight */}
-            {showShelters && nearestShelter && (
+            {/* Destination highlight */}
+            {destination && (
               <Marker
-                position={[nearestShelter.item.latitude, nearestShelter.item.longitude]}
-                icon={nearestShelterIcon}
+                position={[destination.item.latitude, destination.item.longitude]}
+                icon={getDestinationIcon(destinationType ?? 'shelter')}
               >
                 <Popup>
                   <div className="text-sm">
-                    <p className="font-medium text-green-700">Nearest Shelter</p>
-                    <p className="font-medium">{nearestShelter.item.name}</p>
-                    <p>Distance: {nearestShelter.distanceKm.toFixed(2)} km</p>
-                    {(nearestShelter.item as any).address && (
-                      <p className="text-xs text-gray-500">{(nearestShelter.item as any).address}</p>
+                    <p className="font-medium text-green-700">
+                      {destinationType ? DESTINATION_LABELS[destinationType] : 'Destination'}
+                    </p>
+                    <p className="font-medium">{destination.item.name}</p>
+                    <p>Distance: {destination.distanceKm.toFixed(2)} km</p>
+                    {destination.item.address && (
+                      <p className="text-xs text-gray-500">{destination.item.address}</p>
                     )}
                   </div>
                 </Popup>
@@ -312,7 +318,7 @@ export default function MapPage() {
             {/* Shelters */}
             {showShelters &&
               allShelters.map((s, i) => {
-                if (nearestShelter && s.name === nearestShelter.item.name && s.latitude === nearestShelter.item.latitude) return null;
+                if (destination && s.name === destination.item.name && s.latitude === destination.item.latitude) return null;
                 return (
                   <Marker key={`s-${i}`} position={[s.latitude, s.longitude]} icon={shelterIcon}>
                     <Popup>
@@ -329,7 +335,7 @@ export default function MapPage() {
             {/* Hospitals */}
             {showHospitals &&
               allHospitals.map((h, i) => {
-                if (nearestHospital && h.name === nearestHospital.item.name && h.latitude === nearestHospital.item.latitude) return null;
+                if (destination && h.name === destination.item.name && h.latitude === destination.item.latitude) return null;
                 return (
                   <Marker key={`h-${i}`} position={[h.latitude, h.longitude]} icon={hospitalIcon}>
                     <Popup>
@@ -421,35 +427,33 @@ export default function MapPage() {
 
         {/* Sidebar */}
         <div className="space-y-4">
-          <button
-            onClick={() => {
-              setShowRoutePanel((p) => !p);
-              if (!showRoutePanel) fetchRoute();
-            }}
-            disabled={hasGps && overpassLoaded && !nearestShelter}
-            className={`w-full py-2.5 rounded-lg font-medium transition-all ${
-              showRoutePanel
-                ? 'bg-primary-500 text-white'
-                : hasGps && overpassLoaded && !nearestShelter
-                ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
-                : 'bg-emergency-50 text-emergency-600 border border-emergency-200 hover:bg-emergency-100'
-            }`}
-          >
-            {showRoutePanel
-              ? 'Hide Route Info'
-              : hasGps && overpassLoaded && !nearestShelter
-              ? 'No mapped shelters found'
-              : <span className="flex items-center justify-center gap-2"><Navigation className="h-4 w-4" /> Show Safest Route</span>}
-          </button>
+          {destination && (
+            <>
+              <button
+                onClick={() => setShowRoutePanel((p) => !p)}
+                className={`w-full py-2.5 rounded-lg font-medium transition-all ${
+                  showRoutePanel
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-emergency-50 text-emergency-600 border border-emergency-200 hover:bg-emergency-100'
+                }`}
+              >
+                {showRoutePanel ? 'Hide Route Info' : (
+                  <span className="flex items-center justify-center gap-2">
+                    <Navigation className="h-4 w-4" /> Emergency Route
+                  </span>
+                )}
+              </button>
 
-          {showRoutePanel && (
-            <RoutePanel
-              route={route}
-              nearestShelter={nearestShelter}
-              nearestHospital={nearestHospital}
-              routeLoading={routeLoading}
-              onClose={() => setShowRoutePanel(false)}
-            />
+              {showRoutePanel && (
+                <RoutePanel
+                  route={route}
+                  destination={destination}
+                  destinationType={destinationType}
+                  routeLoading={routeLoading}
+                  onClose={() => setShowRoutePanel(false)}
+                />
+              )}
+            </>
           )}
 
           {nearbyLoading && !nearby && (

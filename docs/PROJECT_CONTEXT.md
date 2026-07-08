@@ -337,6 +337,12 @@ aidrac/
 - **Updated EmergencyButton**: uses `/api/location/nearby` instead of separate shelter/hospital API calls
 - **3s Timeout per Category**: each Overpass query independently times out; partial results are still returned
 - **Haversine Server-Side**: distances computed by LocationService before returning, matching frontend calculation
+- **Configurable Overpass Endpoint**: `OVERPASS_API_URL` in settings, with automatic fallback to overpass-api.de and kumi.systems
+- **User-Selectable Emergency Destinations**: redesigned EmergencyButton with 5 destination options (Safe Shelter, Hospital, Police, Fire, Pharmacy), each with color-coded icon buttons
+- **Safe Shelter Priority**: selects best shelter type from available OSM data (amenity=shelter, emergency=shelter, building=shelter, community_centre)
+- **Destination-Based RoutePanel**: replaced separate shelter/hospital display with unified "Destination" label showing the selected facility type
+- **No Cross-Border Routing**: removed DB fallback for routing when GPS is active; routes are computed exclusively from live Overpass results
+- **Retry Logic for Overpass**: each endpoint tried once; success logged; all fail → OverpassError raised
 
 ### Phase 2 — Real-Time Geolocation & Navigation
 - **Browser GPS** via `navigator.geolocation.watchPosition` with continuous tracking

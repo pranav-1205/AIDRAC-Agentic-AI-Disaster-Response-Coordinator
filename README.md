@@ -73,12 +73,20 @@ aidrac/
 - **Straight-line fallback** if both routing APIs are unavailable
 - **Disaster Radius Circles** scaled by severity (critical: 3km, severe: 2km, high: 1.5km, moderate: 1km)
 - **Weather by GPS coordinates** with 5-minute auto-refresh
-- **Enhanced Emergency Button** — finds nearest shelter + hospital, computes safest route, zooms map
 - **Location status indicator** showing GPS state (acquiring, denied, unsupported, active)
-- **Route Panel** with turn-by-turn directions, distance, and estimated walking time
 - **Lazy-loaded map** for faster initial page load
 - **Memoized nearest-location calculations** to avoid unnecessary re-renders
 - **Graceful error handling** —cached data on API failure, straight-line fallback on routing failure, GPS permission denied messaging
+
+### Phase 3.1 (Complete)
+- **Live Overpass Infrastructure** — real-time OSM data for shelters, hospitals, police, fire stations, pharmacies
+- **Configurable Overpass Endpoint** with automatic retry across 3 servers (openstreetmap.fr → overpass-api.de → kumi.systems)
+- **User-Selectable Emergency Destinations** — choose Safe Shelter, Hospital, Police Station, Fire Station, or Pharmacy
+- **Safe Shelter Priority** — automatically selects the best available shelter type
+- **Destination Routing** — computes walking route to the user's selected emergency destination
+- **Or-style Overpass Queries** — supports multiple alternative tags per category
+- **In-Memory TTL Cache** — 10-minute cache for Overpass results with stale-cache fallback
+- **Parallel Category Fetching** — all 5 infrastructure categories queried simultaneously
 
 ## API Endpoints
 
@@ -167,13 +175,14 @@ docker-compose up --build
 | `POSTGRES_DB` | Yes | PostgreSQL database name |
 | `SECRET_KEY` | Yes | JWT signing secret |
 | `OPENWEATHER_API_KEY` | No | OpenWeather API key (mock data used if empty) |
+| `OVERPASS_API_URL` | No | Primary Overpass API endpoint (defaults to openstreetmap.fr, falls back to overpass-api.de, kumi.systems) |
 | `VITE_ORS_API_KEY` | No | OpenRouteService API key (OSRM fallback if empty) |
 
 ### Demo Credentials
 - **Admin:** admin@aidrac.com / admin123
 - **User:** user@aidrac.com / user123
 
-## Phase 3 Roadmap
+## Phase 3.2+ Roadmap
 - Agentic AI integration (LangGraph/CrewAI)
 - Autonomous disaster response coordination
 - LLM-powered decision support

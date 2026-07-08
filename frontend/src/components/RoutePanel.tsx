@@ -1,19 +1,20 @@
 import { useMemo } from 'react';
 import { MapPin, Navigation, Clock, Footprints } from 'lucide-react';
-import type { RouteInfo, NearestItem, NearbyPlace } from '../types';
+import type { RouteInfo, NearestItem, NearbyPlace, EmergencyDestinationType } from '../types';
+import { DESTINATION_LABELS } from '../types';
 
 interface RoutePanelProps {
   route: RouteInfo | null;
-  nearestShelter: NearestItem<NearbyPlace> | null;
-  nearestHospital: NearestItem<NearbyPlace> | null;
+  destination: NearestItem<NearbyPlace> | null;
+  destinationType: EmergencyDestinationType | null;
   routeLoading: boolean;
   onClose: () => void;
 }
 
 export default function RoutePanel({
   route,
-  nearestShelter,
-  nearestHospital,
+  destination,
+  destinationType,
   routeLoading,
   onClose,
 }: RoutePanelProps) {
@@ -37,7 +38,8 @@ export default function RoutePanel({
     );
   }
 
-  if (!route && !nearestShelter && !nearestHospital) {
+  if (!route && !destination) {
+    const label = destinationType ? DESTINATION_LABELS[destinationType].toLowerCase() : 'destination';
     return (
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
@@ -47,7 +49,7 @@ export default function RoutePanel({
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm">&times;</button>
         </div>
-        <p className="text-sm text-gray-500">No mapped shelters found nearby.</p>
+        <p className="text-sm text-gray-500">No nearby {label} found.</p>
       </div>
     );
   }
@@ -62,22 +64,12 @@ export default function RoutePanel({
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm">&times;</button>
       </div>
 
-      {nearestShelter && (
+      {destination && (
         <div className="flex items-center gap-2 text-sm bg-blue-50 rounded-lg p-2.5 mb-3">
           <MapPin className="h-4 w-4 text-primary-500 shrink-0" />
           <span className="text-gray-700">
-            Nearest shelter: <strong>{nearestShelter.item.name}</strong>
-            <span className="text-gray-400 ml-1">({nearestShelter.distanceKm.toFixed(1)} km)</span>
-          </span>
-        </div>
-      )}
-
-      {nearestHospital && (
-        <div className="flex items-center gap-2 text-sm bg-green-50 rounded-lg p-2.5 mb-3">
-          <MapPin className="h-4 w-4 text-green-600 shrink-0" />
-          <span className="text-gray-700">
-            Nearest hospital: <strong>{nearestHospital.item.name}</strong>
-            <span className="text-gray-400 ml-1">({nearestHospital.distanceKm.toFixed(1)} km)</span>
+            Destination: <strong>{destination.item.name}</strong>
+            <span className="text-gray-400 ml-1">({destination.distanceKm.toFixed(1)} km)</span>
           </span>
         </div>
       )}

@@ -651,6 +651,57 @@ This changelog reconstructs the development history of AIDRAC by analyzing the e
 - `docs/PROJECT_CONTEXT.md`
 - `docs/CHANGELOG_AI.md`
 
+### 3.1.8 User-Selectable Emergency Destinations
+
+**Objective:** Redesign the emergency routing flow from a single "Find Safest Route" to a user-selectable destination picker with 5 categories.
+
+**Changes:**
+- **EmergencyButton redesign** (`frontend/src/components/EmergencyButton.tsx`):
+  - Replaced single "Find Safest Route" button with 5 color-coded destination option buttons
+  - Each button has a distinct lucide icon (Home, Heart, Shield, Flame, Pill) and background color
+  - On click: fetches nearby data via `locationApi.nearby()`, finds nearest of selected type, navigates to `/map` with `destinationType` and `destinationItem` in state
+  - Per-button loading spinner via `calculating` state tracking which option is in flight
+  - Disabled state when GPS is unavailable
+  - Preserved the existing `animate-fade-in` menu animation and `animate-bounce` emergency button
+
+- **RoutePanel simplification** (`frontend/src/components/RoutePanel.tsx`):
+  - Replaced `nearestShelter`/`nearestHospital` props with unified `destination: NearestItem<NearbyPlace> | null` and `destinationType: EmergencyDestinationType | null`
+  - Changed "Nearest shelter:" label to "Destination:" — dynamically shows the selected facility type
+  - Error message now reads "No nearby {type} found." where `{type}` is derived from `DESTINATION_LABELS`
+  - Still shows distance, duration, provider, and turn-by-turn directions when route is computed
+
+- **MapPage updates** (`frontend/src/pages/MapPage.tsx`):
+  - Nav state type updated: `nearestShelter`/`nearestHospital` replaced with `destinationType`/`destinationItem`
+  - Destination marker: uses the green highlight icon for any destination type, with popup showing the correct label from `DESTINATION_LABELS`
+  - Route fetching: `fetchRoute` now uses `destination` instead of `nearestShelter`; guards on `!position || !destination`
+  - Route button: only renders when a destination is set from nav state; shows "Emergency Route" / "Hide Route Info"
+  - Shelter/hospital marker deduplication: checks against `destination` instead of `nearestShelter`/`nearestHospital`
+
+- **Type system expansion** (`frontend/src/types/index.ts`):
+  - Added `EmergencyDestinationType` union: `'shelter' | 'hospital' | 'police' | 'firestation' | 'pharmacy'`
+  - Added `DESTINATION_LABELS` constant: maps each type to a human-readable label (Safe Shelter, Hospital, Police Station, Fire Station, Pharmacy)
+
+- **Overpass endpoint resilience** (`backend/app/services/overpass_service.py`):
+  - Added `OVERPASS_API_URL` to `settings.py` with default `https://overpass.openstreetmap.fr/api/interpreter`
+  - Fallback chain: if primary endpoint fails → try `overpass-api.de` → `overpass.kumi.systems`
+  - Each endpoint tried once; success/failure logged via `print(f"[overpass] ...")`
+  - Duplicates deduplicated; all fail → `OverpassError` raised with last failure reason
+  - `.env.example` updated with `OVERPASS_API_URL` variable
+
+- **No cross-border routing**: when GPS is active, MapPage uses ONLY live Overpass results for routing; the seeded PostgreSQL data is never used as routing fallback to prevent routes spanning cities/countries
+
+**Key Files:**
+- `frontend/src/components/EmergencyButton.tsx` (rewritten)
+- `frontend/src/components/RoutePanel.tsx` (rewritten)
+- `frontend/src/pages/MapPage.tsx` (updated nav state, destination logic, route button)
+- `frontend/src/types/index.ts` (added `EmergencyDestinationType`, `DESTINATION_LABELS`)
+- `backend/app/services/overpass_service.py` (added retry/fallback, User-Agent fix)
+- `backend/app/config/settings.py` (added `OVERPASS_API_URL`)
+
+**Architecture Decision:** The emergency flow is now fully state-driven via React Router's `location.state`. EmergencyButton computes the destination and passes it to MapPage. MapPage no longer computes its own nearest-item for routing — it exclusively uses the value from nav state. The Safe Shelter priority is handled implicitly by the backend's combined Overpass query (all shelter-like tags OR'd together). The `DESTINATION_LABELS` constant centralizes display text, keeping it consistent between EmergencyButton and RoutePanel.
+
+---
+
 ## Future Phases
 
 ### Phase 3 — Agentic AI (Planned)
