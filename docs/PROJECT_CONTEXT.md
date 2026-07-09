@@ -363,6 +363,22 @@ aidrac/
 - **PostgreSQL** persistence with auto-seeded demo data
 - **Docker Compose** for full-stack containerized deployment
 
+### Phase 2 — Real-Time Geolocation & Navigation
+- **Browser GPS** via `navigator.geolocation.watchPosition` with continuous tracking
+- **Nearest Shelter Detection** using Haversine distance formula
+- **Nearest Hospital Detection** using Haversine distance formula
+- **Real Routing** via OpenRouteService API (ORS) with OSRM public API fallback
+- **Straight-Line Fallback** when no routing API is available (Haversine-based)
+- **Weather by GPS Coordinates** with 5-minute auto-refresh via polling
+- **Disaster Radius Circles** scaled by severity (critical=3km, severe=2km, high=1.5km, moderate=1km, default=500m)
+- **Route Visualization** with dashed polyline, distance, duration, and turn-by-turn directions
+- **Enhanced Emergency Button** — finds nearest shelter/hospital, computes safest route, navigates to map
+- **GPS Status Indicator** showing acquisition state, permission status, and coordinates
+- **Sorted Nearest Lists** in map sidebar for quick reference
+- **Lazy-Loaded Map** via `React.lazy()` for faster initial bundle
+- **Memoized Distance Calculations** via `useMemo` to avoid unnecessary re-renders
+- **Graceful Error Handling** — cached weather on API failure, straight-line fallback on routing failure, clear GPS permission denied messaging
+
 ### Phase 3.1 — Live Infrastructure from OpenStreetMap
 - **Overpass API Integration** with async HTTP client (httpx) and Overpass QL query builder
 - **5 Infrastructure Categories**: hospitals, shelters, police stations, fire stations, pharmacies
@@ -408,6 +424,24 @@ aidrac/
 - **Backward Compatible**: existing `AlertService.get_all()` and `get_active()` filter out inactive and expired alerts; `POST /api/alerts` unchanged; ContextBuilder filters to CAP-only alerts
 - **Error Resilience**: both feeds attempted concurrently; if both fail → empty alerts returned; never crashes
 - **Weather Unchanged**: `GET /api/weather` continues using existing `WeatherService`; `OpenWeatherProvider` wrapper available for future use
+
+### Phase 3.3B/C — Background Ingestion & Alert Pipeline
+- **Background Refresh**: IMD and NDMA feeds fetched concurrently every 5 minutes via asyncio background task started in FastAPI lifespan. `GET /api/alerts` reads only from PostgreSQL — zero network requests on reads.
+- **Multi-Source Merge**: IMD and NDMA treated as equal peers. Results merged into a single list, deduplicated by `external_id`. CAP XML files downloaded concurrently within each feed.
+- **Alert History & Soft-Delete**: Expired alerts set `is_active=false` and `expired_at=now` instead of being deleted. A configurable retention purge (default 30 days) physically removes stale records. New `/api/alerts/history` endpoint returns deactivated alerts.
+- **In-Memory Caching**: RSS XML and parsed CAP XML are cached via `CacheService` with 5-minute TTL. On network failure, the most recent successful data is served from cache.
+- **Location-Aware Filtering**: `GET /api/alerts` accepts optional `?lat=` and `?lng=` query parameters. A state-resolver maps coordinates to Indian states via bounding boxes. Alerts matching the user's state (by `area` field substring), plus nationwide alerts, are returned. Designed for future polygon-based filtering without API changes.
+- **DisasterProvider Abstraction**: `DisasterProvider` abstract interface with `StaticDisasterProvider` for seeded development data. Ready for live disaster API sources without changing consumers.
+- **Demo Data Cleanup**: seed.py no longer creates demo alerts. Existing demo alerts from earlier runs are marked inactive on first background refresh. ContextBuilder filters to alerts with `external_id IS NOT NULL`.
+
+### Phase 3.3C — Live OSM Infrastructure Pages
+- **Hospitals Page Rewritten** — `/hospitals` uses `useGeolocation` + `locationApi.nearby()` to display live nearby hospitals from OpenStreetMap, sorted by distance, with distance badge, coordinates, and OSM tags shown on each card
+- **Shelters Page Rewritten** — `/shelters` merges `shelters`, `community_centres`, and `schools` from the location service into one sorted-by-distance list, each card showing a type label (Safe Shelter / Community Centre / School) with distinct icons and colors
+- **GPS Location Gate** — both pages require GPS; if unavailable, they show a "Enable Location" button and the `LocationStatus` indicator, never falling back to demo data
+- **Legacy Endpoints Deprecated for Pages** — `GET /api/hospitals` and `GET /api/shelters` remain available as fallback APIs but are no longer used by any user-facing page. The Dashboard still references them for fallback counters when GPS is unavailable.
+- **Type Consistency** — uses `NearbyPlace`/`NearbyResponse` types shared with MapPage, EmergencyButton, and AI ContextBuilder — no duplicate models
+- **Error Handling** — Overpass unavailability shows a user-friendly error with retry button via `ErrorState` component
+- **Zero Demo Data** — no seeded hospitals or shelters appear on either page; data comes exclusively from OpenStreetMap
 
 ### Phase 4.1 — LangGraph Foundation
 - **New Package**: `backend/app/langgraph/` with `models.py`, `state.py`, `nodes.py`, `graph.py` — fully isolated from existing services
@@ -466,39 +500,71 @@ aidrac/
 - **Extensible**: future providers (GraphHopper, ORS, Google Directions, Mapbox) can be added to `RoutingService` without changing the Route Agent — just add a `_provider_name_route()` method and insert it in the priority chain.
 - **Logging**: `[Routing] Calling OSRM`, `[Routing] Provider: OSRM`, `[Routing] OSRM unavailable`, `[Routing] Falling back to straight-line`.
 
-### Phase 3.3B/C — Background Ingestion & Alert Pipeline
-- **Background Refresh**: IMD and NDMA feeds fetched concurrently every 5 minutes via asyncio background task started in FastAPI lifespan. `GET /api/alerts` reads only from PostgreSQL — zero network requests on reads.
-- **Multi-Source Merge**: IMD and NDMA treated as equal peers. Results merged into a single list, deduplicated by `external_id`. CAP XML files downloaded concurrently within each feed.
-- **Alert History & Soft-Delete**: Expired alerts set `is_active=false` and `expired_at=now` instead of being deleted. A configurable retention purge (default 30 days) physically removes stale records. New `/api/alerts/history` endpoint returns deactivated alerts.
-- **In-Memory Caching**: RSS XML and parsed CAP XML are cached via `CacheService` with 5-minute TTL. On network failure, the most recent successful data is served from cache.
-- **Location-Aware Filtering**: `GET /api/alerts` accepts optional `?lat=` and `?lng=` query parameters. A state-resolver maps coordinates to Indian states via bounding boxes. Alerts matching the user's state (by `area` field substring), plus nationwide alerts, are returned. Designed for future polygon-based filtering without API changes.
-- **DisasterProvider Abstraction**: `DisasterProvider` abstract interface with `StaticDisasterProvider` for seeded development data. Ready for live disaster API sources without changing consumers.
-- **Demo Data Cleanup**: seed.py no longer creates demo alerts. Existing demo alerts from earlier runs are marked inactive on first background refresh. ContextBuilder filters to alerts with `external_id IS NOT NULL`.
+### Phase 5 — Incident Memory & Checkpointing
+- **IncidentService**: `backend/app/services/incident_service.py` owns ALL checkpoint lifecycle logic. The service exposes `get_recommendation(question, lat, lng, incident_id) → AIRecommendationResponse` and `get_state(incident_id) → dict | None`. The router is completely agnostic of LangGraph or MemorySaver internals.
+- **Checkpointed Graph**: `graph.py` now exports both `graph` (stateless) and `checkpointed_graph` (with `MemorySaver`). `build_graph()` accepts an optional `checkpointer` parameter passed to `compile()`.
+- **Memory Restoration**: `_restore_or_create()` in `IncidentService` calls `checkpointed_graph.aget_state(config)` to retrieve the previous `StateSnapshot`. If existing state is found, it merges the new `user_question` and `location` into the restored state dict; otherwise it creates a fresh `AgentState`.
+- **Incident Isolation**: each `incident_id` maps to a LangGraph `thread_id`. Different thread IDs are completely isolated in the `MemorySaver` storage — state from incident A never appears in incident B.
+- **Stateless Path**: requests without `incident_id` use the `graph` (no checkpointer), preserving exact backward compatibility with existing clients.
+- **Router Refactored**: `ai.py` is reduced to a ~5-line handler that delegates entirely to `IncidentService`. No checkpoint logic remains in the router.
+- **Logging**: `[Memory] New incident {id}`, `[Memory] Restored incident {id}`, `[Memory] Checkpoint saved`, `[Memory] Using stateless graph`.
+- **AgentState Serialization**: allowed types registered via `MemorySaver.with_allowlist()` to prepare for future strict msgpack mode. All 8 sub-models (`WeatherState`, `AlertState`, `InfrastructureState`, `DestinationState`, `RouteState`, `RecommendationState`, `LocationState`, `AlertItem`, `InfrastructureItem`, `AgentState`) are explicitly allowlisted.
 
-### Phase 3.3C — Live OSM Infrastructure Pages
-- **Hospitals Page Rewritten** — `/hospitals` uses `useGeolocation` + `locationApi.nearby()` to display live nearby hospitals from OpenStreetMap, sorted by distance, with distance badge, coordinates, and OSM tags shown on each card
-- **Shelters Page Rewritten** — `/shelters` merges `shelters`, `community_centres`, and `schools` from the location service into one sorted-by-distance list, each card showing a type label (Safe Shelter / Community Centre / School) with distinct icons and colors
-- **GPS Location Gate** — both pages require GPS; if unavailable, they show a "Enable Location" button and the `LocationStatus` indicator, never falling back to demo data
-- **Legacy Endpoints Deprecated for Pages** — `GET /api/hospitals` and `GET /api/shelters` remain available as fallback APIs but are no longer used by any user-facing page. The Dashboard still references them for fallback counters when GPS is unavailable.
-- **Type Consistency** — uses `NearbyPlace`/`NearbyResponse` types shared with MapPage, EmergencyButton, and AI ContextBuilder — no duplicate models
-- **Error Handling** — Overpass unavailability shows a user-friendly error with retry button via `ErrorState` component
-- **Zero Demo Data** — no seeded hospitals or shelters appear on either page; data comes exclusively from OpenStreetMap
+### Phase 5.1 — Memory-Aware AI Recommendations
 
-### Phase 2 — Real-Time Geolocation & Navigation
-- **Browser GPS** via `navigator.geolocation.watchPosition` with continuous tracking
-- **Nearest Shelter Detection** using Haversine distance formula
-- **Nearest Hospital Detection** using Haversine distance formula
-- **Real Routing** via OpenRouteService API (ORS) with OSRM public API fallback
-- **Straight-Line Fallback** when no routing API is available (Haversine-based)
-- **Weather by GPS Coordinates** with 5-minute auto-refresh via polling
-- **Disaster Radius Circles** scaled by severity (critical=3km, severe=2km, high=1.5km, moderate=1km, default=500m)
-- **Route Visualization** with dashed polyline, distance, duration, and turn-by-turn directions
-- **Enhanced Emergency Button** — finds nearest shelter/hospital, computes safest route, navigates to map
-- **GPS Status Indicator** showing acquisition state, permission status, and coordinates
-- **Sorted Nearest Lists** in map sidebar for quick reference
-- **Lazy-Loaded Map** via `React.lazy()` for faster initial bundle
-- **Memoized Distance Calculations** via `useMemo` to avoid unnecessary re-renders
-- **Graceful Error Handling** — cached weather on API failure, straight-line fallback on routing failure, clear GPS permission denied messaging
+**Objective:** Leverage the restored AgentState so the AI Coordinator can make state-aware disaster recommendations on follow-up questions. This is NOT conversational chat history — only the previous recommendation (risk level, summary, destination, actions) is reused.
+
+- **`build_previous_context(state)`**: new helper in `langgraph/context_builder.py` that extracts from the restored AgentState: previous risk level, recommendation summary, recommended destination, and previous actions. Only included when `incident_id` exists and a checkpoint was restored. Keeps the prompt compact — no raw weather, infrastructure, routes, coordinates, or internal metadata are exposed.
+- **`has_previous_recommendation(state)`**: predicate that returns `True` when the restored state contains a populated `RecommendationState` — used by the coordinator to decide whether to inject previous context.
+- **`build_llm_context(state)`**: reformatted LLM context builder in `langgraph/context_builder.py` that translates the typed AgentState (weather, alerts, infrastructure, route) into a clean text format for the Gemini prompt. Replaces the old `ContextBuilder` in the LangGraph flow (no service calls — data is already collected by agents).
+- **Coordinator Node Update**: `coordinator_node` in `nodes.py` now checks `has_previous_recommendation(state)` before building the prompt. If true, it prepends `build_previous_context(state)` and logs `[Memory] Previous recommendation injected into LLM context`. For new incidents, it logs `[Memory] No previous incident context`.
+- **Prompt Structure** for restored incidents:
+  ```
+  ======================
+  PREVIOUS INCIDENT STATE
+  ======================
+  Previous Risk Level: ...
+  Previous Recommendation Summary: ...
+  Previous Recommended Destination: ...
+  Previous Recommended Actions: ...
+  
+  ======================
+  CURRENT INCIDENT STATE
+  ======================
+  Weather, Alerts, Infrastructure, Route...
+  ```
+- **No API Changes**: all existing REST APIs, request/response schemas, frontend, database, and LangGraph topology unchanged. `incident_id` remains optional — requests without it behave exactly as before.
+- **No Chat History**: only the previous incident recommendation is injected. No conversation history, no message memory, no previous user prompts. AIDRAC remains a disaster response tool, not a chatbot.
+- **Memory Flow**:
+  ```
+  Checkpoint (MemorySaver)
+       ↓
+  Restore AgentState (IncidentService._restore_or_create)
+       ↓
+  Extract Previous Recommendation (has_previous_recommendation)
+       ↓
+  Inject into Context Builder (build_previous_context + build_llm_context)
+       ↓
+  Gemini (AIService.get_recommendation with enriched context)
+       ↓
+  Updated Recommendation (saved to checkpoint)
+  ```
+- **Tests**: `tests/test_memory_aware_context.py` (12 tests):
+  | Test | What It Verifies |
+  |------|------------------|
+  | `test_has_previous_recommendation_false_when_none` | No recommendation → False |
+  | `test_has_previous_recommendation_false_when_empty` | Empty recommendation → False |
+  | `test_has_previous_recommendation_true_when_populated` | Populated recommendation → True |
+  | `test_build_previous_context_contains_fields` | Previous context contains all expected fields |
+  | `test_build_previous_context_empty_when_no_recommendation` | No recommendation → empty string |
+  | `test_build_llm_context_contains_current_info` | Current context has all section headers |
+  | `test_new_incident_no_previous_context` | New incident logs 'No previous incident context' |
+  | `test_restored_incident_injects_previous_context` | Same incident logs injection message |
+  | `test_restored_incident_ai_aware_of_previous` | AI receives previous recommendation context |
+  | `test_different_incident_no_cross_contamination` | Different incident — no cross-contamination |
+  | `test_new_incident_behavior_unchanged` | New incidents behave exactly as before |
+  | `test_memory_recommendation_content_looks_correct` | Responses are sensible after injection |
+- **Logging**: `[Memory] Previous recommendation injected into LLM context` (restored), `[Memory] No previous incident context` (new).
 
 ---
 

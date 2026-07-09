@@ -41,7 +41,7 @@ aidrac/
 │   │   ├── models/          # SQLAlchemy models
 │   │   ├── schemas/         # Pydantic schemas
 │   │   ├── routers/         # API route handlers
-│   │   ├── services/        # Business logic layer
+│   │   ├── services/        # Business logic layer (Weather, Alert, Location, Routing, Incident)
 │   │   └── utils/           # Auth, dependencies
 │   ├── alembic/             # Database migrations
 │   ├── requirements.txt
@@ -120,6 +120,12 @@ aidrac/
 - **Location-Aware Filtering** — `GET /api/alerts?lat=&lng=` returns alerts matching the user's state/area via area string matching; designed for future polygon-based filtering
 - **Demo Data Cleanup** — seed.py no longer creates demo alerts; existing demo alerts marked inactive on first background run; ContextBuilder filters to CAP-only alerts
 - **DisasterProvider Abstraction** — `DisasterProvider` interface with `StaticDisasterProvider` for development data; ready for live disaster API sources
+### Phase 3.3C (Complete)
+- **Live OSM Hospitals Page** — `/hospitals` now uses `GET /api/location/nearby` with GPS position to show live hospitals from OpenStreetMap, sorted by distance, with distance, coordinates, and OSM tags displayed
+- **Live OSM Shelters Page** — `/shelters` now merges shelters, community centres, and schools from the location service, sorted by distance with type labels and OSM tags
+- **GPS Location Prompt** — both pages show "Enable Location" button when GPS is unavailable instead of showing stale demo data
+- **Legacy Endpoints Preserved** — `GET /api/hospitals` and `GET /api/shelters` kept as fallback/legacy APIs; no user-facing pages depend on them
+- **Consistent Types** — uses the same `NearbyPlace` and `NearbyResponse` types as the Map page, EmergencyButton, and routing components
 
 ### Phase 4.1 (Complete)
 - **LangGraph Foundation** — introduced `backend/app/langgraph/` package with `StateGraph`-based sequential workflow
@@ -128,13 +134,6 @@ aidrac/
 - **Sequential Pipeline** — START → Weather → Alert → Infrastructure → Route → Coordinator → END
 - **Isolated Package** — no existing services, APIs, or frontend code modified; `langgraph/` is a self-contained orchestration foundation
 - **Installed Dependency** — `langgraph>=1.2.0` added to `requirements.txt`
-
-### Phase 3.3C (Complete)
-- **Live OSM Hospitals Page** — `/hospitals` now uses `GET /api/location/nearby` with GPS position to show live hospitals from OpenStreetMap, sorted by distance, with distance, coordinates, and OSM tags displayed
-- **Live OSM Shelters Page** — `/shelters` now merges shelters, community centres, and schools from the location service, sorted by distance with type labels and OSM tags
-- **GPS Location Prompt** — both pages show "Enable Location" button when GPS is unavailable instead of showing stale demo data
-- **Legacy Endpoints Preserved** — `GET /api/hospitals` and `GET /api/shelters` kept as fallback/legacy APIs; no user-facing pages depend on them
-- **Consistent Types** — uses the same `NearbyPlace` and `NearbyResponse` types as the Map page, EmergencyButton, and routing components
 
 ### Phase 4.2 (Complete)
 - **Service-Backed LangGraph Agents** — 5 real agents (Weather, Alert, Infrastructure, Route, Coordinator) replacing Phase 4.1 placeholders
@@ -175,6 +174,24 @@ aidrac/
 - **Route Agent Refactored** — Route Agent now calls `RoutingService.get_route(origin, dest, type)`; no routing calculations live in the agent
 - **Extensible Architecture** — new providers (GraphHopper, ORS, Google, Mapbox) can be added to RoutingService without changing the Route Agent
 
+### Phase 5 (Complete)
+- **IncidentService** — new `backend/app/services/incident_service.py` owns ALL LangGraph checkpoint logic (restore, execute, save), keeping the router completely agnostic of MemorySaver internals
+- **Incident Memory** — optional `incident_id` in the request preserves complete `AgentState` across requests using LangGraph's native `MemorySaver` checkpointer
+- **State Restoration** — when the same `incident_id` is reused, previous agent outputs (weather, alerts, infrastructure, route, recommendation) are restored and merged with new question/location before graph execution
+- **Incident Isolation** — different `incident_id` values maintain completely independent state; no cross-contamination
+- **Router Refactored** — `POST /api/ai/recommendation` is now a 5-line handler that delegates entirely to `IncidentService`
+- **Backward Compatible** — requests without `incident_id` continue to use a stateless graph; the API schema is unchanged
+
+### Phase 5.1 (Complete)
+- **Memory-Aware AI Recommendations** — the Coordinator injects the previous incident recommendation into the LLM context when an existing incident is restored, enabling state-aware follow-up questions
+- **`build_previous_context(state)`** — new helper in `langgraph/context_builder.py` extracts only previous risk level, summary, destination, and actions (not raw weather/infrastructure/route data) from the restored AgentState
+- **`has_previous_recommendation(state)`** — predicate that checks if the restored AgentState contains a populated recommendation
+- **Logging** — `[Memory] Previous recommendation injected into LLM context` for restored incidents; `[Memory] No previous incident context` for new incidents
+- **No Cross-Contamination** — previous recommendation is only injected when the same `incident_id` is reused; different incidents remain fully isolated
+- **Prompt Structure** — restored incidents see: `PREVIOUS INCIDENT STATE` → `CURRENT INCIDENT STATE` → `USER QUESTION` in the LLM prompt
+- **No API Changes** — all existing APIs, frontend, and graph topology unchanged
+- **No Chat History** — only the previous recommendation is reused; no conversation history, no message memory, no previous user prompts
+
 ## AI Decision Support
 
 AIDRAC features a multi-agent AI decision system powered by LangGraph and Gemini:
@@ -205,11 +222,16 @@ The agents execute in a parallel graph topology:
                  Route                          ← depends on Infrastructure + others
                    │
                    ▼
-              Coordinator                      ← Gemini or deterministic fallback
-                   │
-                   ▼
-              Recommendation
+               Coordinator                      ← Gemini or deterministic fallback
+                    │
+                    ▼
+               Recommendation
+                    │
+                    ▼
+              IncidentService                ← MemorySaver checkpoints (optional incident_id)
 ```
+
+When `incident_id` is provided, the complete `AgentState` is checkpointed after each graph execution via LangGraph's `MemorySaver`. Subsequent requests with the same `incident_id` restore the previous state before the graph runs, enabling context-aware incident tracking across requests.
 
 ## API Endpoints
 
@@ -233,7 +255,7 @@ The agents execute in a parallel graph topology:
 | GET | `/api/alerts/history` | List expired/deactivated alerts |
 | GET | `/api/routes` | List evacuation routes |
 | POST | `/api/routes` | Create route |
-| POST | `/api/ai/recommendation` | AI emergency recommendation (question, optional lat/lng) |
+| POST | `/api/ai/recommendation` | AI emergency recommendation (question, optional lat/lng, optional incident_id) |
 
 ## Setup Instructions
 
@@ -313,8 +335,7 @@ docker-compose up --build
 - **Admin:** admin@aidrac.com / admin123
 - **User:** user@aidrac.com / user123
 
-## Phase 4.6+ Roadmap
-- **Memory/Persistence** — LangGraph checkpointer for multi-turn conversations and state persistence across sessions
+## Phase 6+ Roadmap
 - **Agent Observability** — LangSmith integration for tracing, monitoring, and debugging agent execution
 - **Human-in-the-Loop** — breakpoints for coordinator approval before critical recommendations
 - **Multi-turn Conversations** — agent remembers past questions and context across sessions

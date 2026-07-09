@@ -5,6 +5,7 @@ class AIRecommendationRequest(BaseModel):
     question: str
     lat: float | None = None
     lng: float | None = None
+    incident_id: str | None = None
 
 
 class RecommendedDestination(BaseModel):

@@ -1310,3 +1310,245 @@ Created `backend/app/services/disaster_sources/`:
 ### 4.5.4 Extensibility
 
 Future providers (GraphHopper, OpenRouteService, Google Directions, Mapbox) can be added by creating a `_provider_route()` method and inserting it into the priority chain. The Route Agent never needs changes when providers are added or removed.
+
+---
+
+## Phase 4.5.1 — LangGraph Integration into Production Endpoint
+
+**Objective:** Route the production AI recommendation endpoint through the LangGraph graph instead of calling `ContextBuilder` + `AIService` directly. Keep the existing API schema and frontend completely unchanged.
+
+### 4.5.1.1 Router Refactored
+
+**Changes to `backend/app/routers/ai.py`:**
+- Added `from app.langgraph.graph import graph` and `from app.langgraph.state import AgentState`
+- Replaced `context_builder.build()` + `ai_service.get_recommendation()` with a single `graph.ainvoke(AgentState(...))` call
+- Added `_recommendation_to_response(result)` mapper function that converts `RecommendationState` + `DestinationState` + `RouteState` into the existing `AIRecommendationResponse` schema
+- Removed `context_builder` and `ai_service` imports and their module-level instances
+- All input validation, lat/lng defaults (Delhi), and response serialization patterns preserved
+
+### 4.5.1.2 Response Mapping
+
+`_recommendation_to_response(result)` maps:
+- `result["recommendation"].risk_level` → `response.riskLevel`
+- `result["recommendation"].summary` → `response.summary`
+- `result["recommendation"].actions` → `response.actions`
+- `result["recommendation"].reason` → `response.reason`
+- `result["selected_destination"].item.name` + `result["selected_destination"].destination_type` → `response.recommended_destination` (None if no destination)
+- `result["route"].distance_km` + `result["route"].duration_min` + `result["route"].provider` → `response.route`
+
+### 4.5.1.3 What Was NOT Changed
+- `AIRecommendationRequest` and `AIRecommendationResponse` schemas — unchanged (backward-compatible)
+- `AIService` — unused but preserved for future direct use
+- `ContextBuilder` — unused but preserved for future use
+- LangGraph topology — unchanged
+- All REST APIs — unchanged
+- Frontend — unchanged
+- No new dependencies
+
+---
+
+## Phase 5 — Incident State & Persistence
+
+**Objective:** Introduce incident-level state persistence using LangGraph's `MemorySaver` checkpointer so that repeat requests with the same `incident_id` preserve previous agent outputs. Refactor the router to delegate all checkpoint logic to a dedicated `IncidentService`.
+
+### 5.1 IncidentService
+
+**Created `backend/app/services/incident_service.py`:**
+- `IncidentService.get_recommendation(question, lat, lng, incident_id) → AIRecommendationResponse` — single public method that owns the complete checkpoint lifecycle
+- `_restore_or_create(incident_id) → tuple[AgentState, Config]`: if `incident_id` is provided and a checkpoint exists, calls `checkpointed_graph.aget_state(config)` to retrieve the previous `StateSnapshot`, merges the new `user_question` and `location` into the restored state, and returns the merged state + config. If no previous state, creates a fresh `AgentState` with a new config.
+- `get_state(incident_id) → dict | None`: public inspection method that returns the raw checkpointed state for a given incident (or None if unknown)
+- `_to_response(result) → AIRecommendationResponse`: maps the post-execution result from `checkpointed_graph` back to the API response schema (identical logic to the old `_recommendation_to_response`)
+- Logging: `[Memory] New incident {id}`, `[Memory] Restored incident {id}`, `[Memory] Checkpoint saved`, `[Memory] Using stateless graph`
+
+### 5.2 Checkpointed Graph
+
+**Changes to `backend/app/langgraph/graph.py`:**
+- Added `from langgraph.checkpoint.memory import MemorySaver`
+- `build_graph()` now accepts an optional `checkpointer` parameter passed to `graph.compile(checkpointer=checkpointer)`
+- Module-level `checkpointed_graph = build_graph(checkpointer=MemorySaver())` — compiled with memory persistence
+- Existing `graph = build_graph()` — unchanged (no checkpointer, stateless)
+- Both graphs use the exact same topology and nodes
+
+### 5.3 AgentState Serialization
+
+**Changes to `backend/app/langgraph/state.py`:**
+- All 8 sub-models and their container types registered via `MemorySaver.with_allowlist()` to prepare for strict msgpack mode
+- Allowlisted types: `AgentState`, `WeatherState`, `AlertState`, `AlertItem`, `InfrastructureState`, `InfrastructureItem`, `DestinationState`, `RouteState`, `RecommendationState`, `LocationState`
+- All serialization registrations happen at module load time in `graph.py`
+
+### 5.4 Request Schema Extension
+
+**Changes to `backend/app/ai/schemas.py`:**
+- Added `incident_id: str | None = None` optional field to `AIRecommendationRequest`
+- No changes to `AIRecommendationResponse`
+
+### 5.5 Router Refactored (Cleanup)
+
+**Changes to `backend/app/routers/ai.py`:**
+- Replaced direct `graph.ainvoke(...)` + `_recommendation_to_response(...)` with `await incident_service.get_recommendation(...)`
+- Removed `_recommendation_to_response()` mapper entirely — logic moved into `IncidentService._to_response()`
+- Removed `from app.langgraph.graph import graph` and `from app.ai.schemas import AgentState` imports
+- Added `from app.services.incident_service import IncidentService`
+- Added `incident_service = IncidentService()` module-level singleton
+- Handler reduced to 8 lines: validates input, calls service, returns response
+- Zero checkpoint/memory logic remains in the router
+
+### 5.6 Incident Lifecycle
+
+The checkpoint lifecycle works as follows:
+
+1. **No incident_id**: request runs on the stateless `graph` — no checkpoint created, no memory overhead (fully backward compatible)
+2. **New incident_id**: `_restore_or_create()` detects no prior checkpoint, creates a fresh `AgentState` with `{user_question, latitude, longitude}`, executes the graph, saves checkpoint via `MemorySaver`
+3. **Existing incident_id**: `_restore_or_create()` retrieves the previous `StateSnapshot`, merges the new question/location into the prior state (preserving all previous agent outputs), executes the graph (agents overwrite their respective state keys), checkpoint updated after execution
+4. **Unknown incident_id**: `get_state()` returns `None` — the service never crashes on bad incident IDs
+
+### 5.7 Testing
+
+**Created `backend/tests/test_incident_service.py`** with 8 tests:
+
+| Test | What It Verifies |
+|------|------------------|
+| `test_stateless_graph` | Request without `incident_id` returns valid response with no checkpoint |
+| `test_new_incident` | New `incident_id` creates checkpoint; subsequent `get_state()` returns typed state |
+| `test_restored_incident` | Second request with same `incident_id` restores previous state; final coordinator output present |
+| `test_incident_isolation` | Two different incident IDs produce independent states — state from A never appears in B |
+| `test_unknown_incident_state` | `get_state("nonexistent-id")` returns `None` without crashing |
+| `test_checkpoint_typed_state` | Checkpointed state contains typed `WeatherState`, `AlertState`, etc. (not raw dicts) |
+| `test_parallel_incident_execution` | Two incidents can be created and restored concurrently without race conditions |
+| `test_endpoint_compatibility` | Full HTTP test against `POST /api/ai/recommendation` — both with and without `incident_id` return 200 with valid response schema |
+
+### 5.8 What Was NOT Changed
+- `AIService`, `ContextBuilder`, `AIAssistant.tsx` — untouched
+- `models.py`, `nodes.py`, `graph.py` (topology) — unchanged (only `checkpointed_graph` added)
+- All REST APIs — schema unchanged (incident_id is optional)
+- Frontend — unchanged
+- Database — unchanged (MemorySaver is in-memory only)
+- LangGraph topology — unchanged
+- No new Python dependencies
+
+---
+
+## Phase 5.1 — Memory-Aware AI Recommendations
+
+**Objective:** Leverage the restored AgentState so the AI Coordinator can make state-aware disaster recommendations on follow-up questions without converting AIDRAC into a chatbot.
+
+### 5.1.1 Context Builder (LangGraph)
+
+**Created `backend/app/langgraph/context_builder.py`** with two helpers:
+
+- **`build_llm_context(state) → str`**: Formats the current AgentState into a structured text section (`CURRENT INCIDENT STATE`) with weather, alerts, infrastructure, and route subsections. Uses typed Pydantic models directly — no external service calls.
+- **`build_previous_context(state) → str`**: Extracts ONLY the previous recommendation from restored state:
+  - Previous Risk Level
+  - Previous Recommendation Summary
+  - Previous Recommended Destination (if any)
+  - Previous Recommended Actions (numbered list)
+  
+  Returns empty string if no previous recommendation exists.
+- **`has_previous_recommendation(state) → bool`**: Returns `True` when the AgentState contains a populated `RecommendationState` (i.e., this is a restored incident).
+
+### 5.1.2 Coordinator Node Update
+
+**Changes to `backend/app/langgraph/nodes.py`:**
+- Updated import: now imports `build_llm_context`, `build_previous_context`, and `has_previous_recommendation`
+- `coordinator_node` now checks `has_previous_recommendation(state)` before building the prompt
+- If previous recommendation exists: prepends `build_previous_context(state)` → `build_llm_context(state)` → sent to AIService
+- If no previous recommendation: uses only `build_llm_context(state)` (identical to Phase 5 behavior)
+- Logging: `[Memory] Previous recommendation injected into LLM context` on restore; `[Memory] No previous incident context` on new
+
+### 5.1.3 Prompt Structure
+
+For restored incidents, the LLM receives:
+
+```
+PREVIOUS INCIDENT STATE:
+- Previous Risk Level
+- Previous Recommendation Summary
+- Previous Recommended Destination
+- Previous Recommended Actions
+
+CURRENT INCIDENT STATE:
+- Weather
+- Alerts
+- Infrastructure
+- Route
+
+USER QUESTION:
+- Current question
+```
+
+For new incidents, the prompt structure is identical to Phase 5 (only `CURRENT INCIDENT STATE` + `USER QUESTION`).
+
+### 5.1.4 Memory Flow
+
+```
+Checkpoint (MemorySaver)
+     ↓
+Restore AgentState (_restore_or_create)
+     ↓
+Extract Previous Recommendation (has_previous_recommendation)
+     ↓
+Inject into Context Builder (build_previous_context + build_llm_context)
+     ↓
+Gemini (AIService.get_recommendation with enriched context)
+     ↓
+Updated Recommendation (saved to checkpoint)
+```
+
+### 5.1.5 What Was NOT Changed
+- `AIService`, `ContextBuilder` (ai/), `AIAssistant.tsx` — untouched
+- `models.py`, `state.py`, `graph.py` (topology) — unchanged
+- All REST APIs — schema unchanged (incident_id remains optional)
+- Frontend — unchanged
+- Database — unchanged
+- LangGraph parallelism — unchanged
+- No new Python dependencies
+- No chat history, no message memory, no previous user prompts stored
+- IncidentService — unchanged (restoration state flows through AgentState naturally)
+
+### 5.1.6 Testing
+
+**Created `backend/tests/test_memory_aware_context.py`** with 12 tests:
+
+| Test | What It Verifies |
+|------|------------------|
+| `test_has_previous_recommendation_false_when_none` | No recommendation → False |
+| `test_has_previous_recommendation_false_when_empty` | Empty recommendation → False |
+| `test_has_previous_recommendation_true_when_populated` | Populated recommendation → True |
+| `test_build_previous_context_contains_fields` | Previous context contains risk, summary, destination, actions |
+| `test_build_previous_context_empty_when_no_recommendation` | No recommendation → empty string |
+| `test_build_llm_context_contains_current_info` | Current context has Weather/Alerts/Infrastructure/Route sections |
+| `test_new_incident_no_previous_context` | Captured stdout shows `No previous incident context` |
+| `test_restored_incident_injects_previous_context` | Captured stdout shows `Previous recommendation injected` |
+| `test_restored_incident_ai_aware_of_previous` | Follow-up question gets AI recommendation with previous context |
+| `test_different_incident_no_cross_contamination` | Different incident — no previous recommendation visible |
+| `test_new_incident_behavior_unchanged` | New incidents (with/without incident_id) behave like Phase 5 |
+| `test_memory_recommendation_content_looks_correct` | Responses are sensible after injection |
+
+### 5.1.7 Demo Logs
+
+**New Incident:**
+```
+[Memory] New incident demo-restore
+[LangGraph] Coordinator started
+[Coordinator] Building LLM context
+[Memory] No previous incident context
+[Coordinator] Calling AIService
+```
+
+**Restored Incident (same incident_id):**
+```
+[Memory] Restored incident demo-restore
+[LangGraph] Coordinator started
+[Coordinator] Building LLM context
+[Memory] Previous recommendation injected into LLM context
+[Coordinator] Calling AIService
+```
+
+**Different Incident (isolated):**
+```
+[Memory] New incident other-incident
+[LangGraph] Coordinator started
+[Coordinator] Building LLM context
+[Memory] No previous incident context
+[Coordinator] Calling AIService
+```

@@ -1,4 +1,3 @@
-from typing import Any
 from app.services.weather import WeatherService
 from app.services.location_service import LocationService
 from app.database.connection import async_session_factory

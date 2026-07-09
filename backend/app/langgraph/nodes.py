@@ -12,7 +12,7 @@ from app.langgraph.models import (
     RouteState,
     RecommendationState,
 )
-from app.langgraph.context_builder import build_llm_context
+from app.ai.state_context_builder import StateContextBuilder
 from app.services.weather import WeatherService
 from app.services.alert import AlertService
 from app.services.location_service import LocationService
@@ -173,7 +173,8 @@ async def route_node(state: AgentState) -> dict:
 async def coordinator_node(state: AgentState) -> dict:
     print("[LangGraph] Coordinator started")
     print("[Coordinator] Building LLM context")
-    context = build_llm_context(state)
+
+    context = StateContextBuilder.build(state)
 
     try:
         print("[Coordinator] Calling AIService")
