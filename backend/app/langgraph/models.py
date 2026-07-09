@@ -69,3 +69,6 @@ class RecommendationState(BaseModel):
     summary: Optional[str] = None
     actions: list[str] = []
     risk_level: Optional[str] = None
+    reasoning: Optional[str] = None
+    recommended_destination: Optional[str] = None
+    source: str = "fallback"

@@ -35,7 +35,8 @@ async def test_graph_executes_without_crashing():
     assert isinstance(result["recommendation"], RecommendationState)
     assert len(result["recommendation"].summary) > 0
 
-    print("[test] Graph executes and all state fields are properly typed")
+    src = result["recommendation"].source
+    print(f"[test] Graph executes — Recommendation Source: {src.capitalize()}")
 
 
 async def test_graph_with_gps_coordinates():
@@ -53,7 +54,8 @@ async def test_graph_with_gps_coordinates():
     assert isinstance(result["route"], RouteState)
     assert isinstance(result["recommendation"], RecommendationState)
 
-    print("[test] Graph with GPS coordinates executes successfully")
+    src = result["recommendation"].source
+    print(f"[test] Graph with GPS — Recommendation Source: {src.capitalize()}")
 
 
 async def test_coordinator_populates_summary():
@@ -64,9 +66,10 @@ async def test_coordinator_populates_summary():
     rec = result["recommendation"]
     assert isinstance(rec, RecommendationState)
     assert rec.summary is not None
-    assert "All agents completed" in rec.summary
+    assert len(rec.summary) > 0
     assert isinstance(rec.actions, list)
-    print("[test] Coordinator populates summary and actions correctly")
+    assert rec.source in ("gemini", "fallback")
+    print(f"[test] Coordinator populates summary — Source: {rec.source.capitalize()}")
 
 
 if __name__ == "__main__":

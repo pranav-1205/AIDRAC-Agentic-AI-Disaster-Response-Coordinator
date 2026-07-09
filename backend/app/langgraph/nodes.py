@@ -13,15 +13,29 @@ from app.langgraph.models import (
     RouteState,
     RecommendationState,
 )
+from app.langgraph.context_builder import build_llm_context
 from app.services.weather import WeatherService
 from app.services.alert import AlertService
 from app.services.location_service import LocationService, _haversine
 from app.database.connection import async_session_factory
+from app.ai.ai_service import AIService
+from app.ai.schemas import AIRecommendationResponse
+from app.config.settings import settings
 
 _weather_service = WeatherService()
 _location_service = LocationService()
+_ai_service = AIService(api_key=settings.GEMINI_API_KEY)
 
 SEVERITY_RANK = {"critical": 0, "severe": 1, "high": 2, "warning": 3, "advisory": 4, "info": 5}
+
+_DEGRADED_INDICATORS = (
+    "not configured",
+    "temporarily unavailable",
+    "quota exceeded",
+    "unexpected",
+    "authentication failed",
+    "not available",
+)
 
 
 async def weather_node(state: AgentState) -> dict:
@@ -156,25 +170,103 @@ async def route_node(state: AgentState) -> dict:
 
 
 async def coordinator_node(state: AgentState) -> dict:
-    weather_status = "available" if state.weather and state.weather.temperature is not None else "unavailable"
+    print("[Coordinator] Building LLM context")
+    context = build_llm_context(state)
+
+    try:
+        print("[Coordinator] Calling AIService")
+        ai_response: AIRecommendationResponse = await _ai_service.get_recommendation(
+            question=state.user_question,
+            context=context,
+        )
+
+        if _is_degraded(ai_response):
+            print("[Coordinator] AI unavailable")
+            print("[Coordinator] Using deterministic fallback")
+            rec = _deterministic_recommendation(state, source="fallback")
+        else:
+            print("[Coordinator] AI recommendation parsed")
+            rec = _map_ai_response(ai_response)
+    except Exception:
+        print("[Coordinator] AI unavailable")
+        print("[Coordinator] Using deterministic fallback")
+        rec = _deterministic_recommendation(state, source="fallback")
+
+    return {"recommendation": rec}
+
+
+# ---------------------------------------------------------------------------
+# Coordinator helpers
+# ---------------------------------------------------------------------------
+
+
+def _is_degraded(response: AIRecommendationResponse) -> bool:
+    s = (response.summary or "").lower()
+    r = (response.reason or "").lower()
+    return any(k in s or k in r for k in _DEGRADED_INDICATORS)
+
+
+def _map_ai_response(response: AIRecommendationResponse) -> RecommendationState:
+    dest_name = None
+    if response.recommendedDestination:
+        dest_name = (
+            f"{response.recommendedDestination.type}: "
+            f"{response.recommendedDestination.name}"
+        )
+
+    return RecommendationState(
+        summary=response.summary,
+        actions=response.actions,
+        risk_level=response.riskLevel,
+        reasoning=response.reason,
+        recommended_destination=dest_name,
+        source="gemini",
+    )
+
+
+def _deterministic_recommendation(
+    state: AgentState, source: str = "fallback"
+) -> RecommendationState:
+    weather_status = (
+        "available"
+        if state.weather and state.weather.temperature is not None
+        else "unavailable"
+    )
     alert_count = state.alerts.total_alerts if state.alerts else 0
     infra_count = _count_infrastructure(state.infrastructure)
     route_status = "available" if state.route and state.route.distance_km else "unavailable"
 
     summary = (
-        f"All agents completed. Weather: {weather_status}. "
-        f"Active alerts: {alert_count}. "
-        f"Nearby facilities: {infra_count}. "
-        f"Route: {route_status}."
+        f"Based on available data: Weather {weather_status}, "
+        f"{alert_count} active alerts, "
+        f"{infra_count} nearby facilities, "
+        f"route {route_status}. "
+        "Please follow local authority guidance."
     )
 
-    return {
-        "recommendation": RecommendationState(
-            summary=summary,
-            actions=_suggest_actions(state),
-            risk_level=state.weather.risk_level if state.weather and state.weather.risk_level else "unknown",
+    risk = (
+        state.weather.risk_level
+        if state.weather and state.weather.risk_level
+        else "unknown"
+    )
+    if state.alerts and state.alerts.highest_severity in ("critical", "severe"):
+        risk = "high"
+
+    dest_name = None
+    if state.destination and state.destination.destination:
+        dest_name = (
+            f"{state.destination.destination_type}: "
+            f"{state.destination.destination.name}"
         )
-    }
+
+    return RecommendationState(
+        summary=summary,
+        actions=_suggest_actions(state),
+        risk_level=risk,
+        reasoning="AI service unavailable; recommendation based on available agent data.",
+        recommended_destination=dest_name,
+        source=source,
+    )
 
 
 # ---------------------------------------------------------------------------
