@@ -29,15 +29,13 @@ aidrac/
 ├── backend/
 │   ├── app/
 │   │   ├── ai/               # AI Decision Support (Gemini)
-│   │   ├── langgraph/        # LangGraph orchestration (Phase 4.1)
+│   │   ├── langgraph/        # LangGraph multi-agent orchestration
+│   │   │   ├── __init__.py       # Exports compiled graph
 │   │   │   ├── models.py         # Strongly typed Pydantic models
 │   │   │   ├── state.py          # Shared AgentState with typed fields
-│   │   │   ├── nodes.py          # Placeholder agent nodes
-│   │   │   └── graph.py          # Graph builder & compiled graph
-│   │   │   ├── prompts.py        # System prompt
-│   │   │   ├── context_builder.py# Context collection & normalization
-│   │   │   ├── ai_service.py     # Gemini client & response parsing
-│   │   │   └── schemas.py        # Request/response Pydantic models
+│   │   │   ├── nodes.py          # Service-backed agent nodes
+│   │   │   ├── graph.py          # Parallel graph builder & compiled graph
+│   │   │   └── context_builder.py# AgentState→LLM context (no service calls)
 │   │   ├── config/          # Application settings
 │   │   ├── database/        # DB connection & seed data
 │   │   ├── models/          # SQLAlchemy models
@@ -137,6 +135,81 @@ aidrac/
 - **GPS Location Prompt** — both pages show "Enable Location" button when GPS is unavailable instead of showing stale demo data
 - **Legacy Endpoints Preserved** — `GET /api/hospitals` and `GET /api/shelters` kept as fallback/legacy APIs; no user-facing pages depend on them
 - **Consistent Types** — uses the same `NearbyPlace` and `NearbyResponse` types as the Map page, EmergencyButton, and routing components
+
+### Phase 4.2 (Complete)
+- **Service-Backed LangGraph Agents** — 5 real agents (Weather, Alert, Infrastructure, Route, Coordinator) replacing Phase 4.1 placeholders
+- **Weather Agent** — calls `WeatherService.get_current_weather(lat, lng)`, infers risk level from temp/description
+- **Alert Agent** — calls `AlertService.get_all()` via DB session, maps to typed `AlertItem[]` with severity ranking
+- **Infrastructure Agent** — calls `LocationService` for all 7 categories in parallel (hospitals, shelters, community centres, schools, police, fire stations, pharmacies)
+- **Route Agent** — picks nearest facility across all categories, computes Haversine distance and walking ETA
+- **Coordinator Agent** — aggregates upstream state into `RecommendationState` (placeholder, no Gemini yet)
+
+### Phase 4.3 (Complete)
+- **Gemini Coordinator** — replaces placeholder with real AI reasoning via existing `AIService`
+- **LangGraph Context Builder** — `build_llm_context(state)` converts `AgentState` to a compact LLM prompt (no service calls, no DB, no HTTP)
+- **Deterministic Fallback** — when Gemini is unavailable, Coordinator generates recommendations using only `AgentState` (alert severity, weather risk, nearby facilities)
+- **Structured Recommendations** — `RecommendationState` extended with `reasoning`, `recommended_destination`, and `source` ("gemini" or "fallback") fields
+- **Degraded Response Detection** — Coordinator detects non-exception Gemini failures (quota, auth, network) via `_is_degraded()` before falling back
+
+### Phase 4.3.1 (Complete)
+- **Upgraded AI Decision Support UI** — polished card-based recommendation layout in existing Dashboard AIAssistant component
+- **Risk Badge** — color-coded risk level display (green/yellow/orange/red/gray)
+- **Destination Card** — icon + type label + name for recommended destination
+- **Action Checklist** — green checkmarks instead of numbered circles
+- **Explainability Section** — collapsible "How this recommendation was generated" showing all 5 agents
+- **Live Data Sources Footer** — displays OpenWeather, IMD/NDMA CAP, OpenStreetMap, Gemini
+- **Loading/Error/Empty States** — spinner with "Analyzing your situation...", retry button, example questions
+
+### Phase 4.4 (Complete)
+- **Parallel LangGraph Execution** — Weather, Alert, and Infrastructure agents execute concurrently via LangGraph's native fan-out
+- **Fan-out from START** — all three independent agents launched simultaneously
+- **Fan-in to Route** — Route agent waits for all three upstream agents to complete before executing
+- **Orchestration Logging** — `[LangGraph] <Node> started` prints at each node's entry, demonstrating parallelism
+- **Fault Tolerance** — if one parallel branch fails, the other branches still complete; Coordinator executes with whatever state is available
+- **No Business Logic Changes** — only graph topology and logging modified; agent logic, APIs, and frontend untouched
+
+### Phase 4.5 (Complete)
+- **RoutingService Abstraction** — new `backend/app/services/routing_service.py` decouples the Route Agent from routing implementation
+- **OSRM Provider** — Route Agent calls OSRM public API for real road/path distances with turn-by-turn directions and full polyline
+- **Automatic Straight-Line Fallback** — if OSRM times out, returns HTTP error, or is rate-limited, RoutingService transparently falls back to Haversine straight-line
+- **Route Agent Refactored** — Route Agent now calls `RoutingService.get_route(origin, dest, type)`; no routing calculations live in the agent
+- **Extensible Architecture** — new providers (GraphHopper, ORS, Google, Mapbox) can be added to RoutingService without changing the Route Agent
+
+## AI Decision Support
+
+AIDRAC features a multi-agent AI decision system powered by LangGraph and Gemini:
+
+1. **Weather Agent** — fetches real-time conditions from OpenWeather, infers risk level
+2. **Alert Agent** — loads active CAP alerts from the database with severity analysis
+3. **Infrastructure Agent** — queries OpenStreetMap for 7 categories of nearby facilities
+4. **Route Agent** — computes the nearest safe destination with walking ETA via `RoutingService` (OSRM or straight-line fallback)
+5. **Coordinator Agent** — synthesizes all agent outputs using Gemini (or deterministic fallback) into a structured recommendation
+
+The recommendation is displayed in the Dashboard's AI Decision Support card with risk badge, summary, recommended destination, action checklist, and explainability section.
+
+## LangGraph Workflow
+
+The agents execute in a parallel graph topology:
+
+```text
+                START
+                   │
+      ┌────────────┼────────────┐
+      │            │            │
+      ▼            ▼            ▼
+  Weather      Alert      Infrastructure        ← parallel
+      │            │            │
+      └────────────┴────────────┘
+                   │
+                   ▼
+                 Route                          ← depends on Infrastructure + others
+                   │
+                   ▼
+              Coordinator                      ← Gemini or deterministic fallback
+                   │
+                   ▼
+              Recommendation
+```
 
 ## API Endpoints
 
@@ -240,9 +313,9 @@ docker-compose up --build
 - **Admin:** admin@aidrac.com / admin123
 - **User:** user@aidrac.com / user123
 
-## Phase 4.2+ Roadmap
-- Weather Agent — real OpenWeather API integration via LangGraph node
-- Alert Agent — live CAP alert context enrichment
-- Infrastructure Agent — Overpass-based nearby facility selection
-- Route Agent — routing computation with provider fallback
-- Coordinator Agent — Gemini-powered final recommendation generation
+## Phase 4.6+ Roadmap
+- **Memory/Persistence** — LangGraph checkpointer for multi-turn conversations and state persistence across sessions
+- **Agent Observability** — LangSmith integration for tracing, monitoring, and debugging agent execution
+- **Human-in-the-Loop** — breakpoints for coordinator approval before critical recommendations
+- **Multi-turn Conversations** — agent remembers past questions and context across sessions
+- **Additional Agents** — resource allocation agent, population density agent, weather forecasting agent

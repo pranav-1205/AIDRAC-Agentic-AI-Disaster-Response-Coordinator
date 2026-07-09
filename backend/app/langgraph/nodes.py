@@ -1,5 +1,4 @@
 import asyncio
-import math
 
 from app.langgraph.state import AgentState
 from app.langgraph.models import (
@@ -16,7 +15,8 @@ from app.langgraph.models import (
 from app.langgraph.context_builder import build_llm_context
 from app.services.weather import WeatherService
 from app.services.alert import AlertService
-from app.services.location_service import LocationService, _haversine
+from app.services.location_service import LocationService
+from app.services.routing_service import RoutingService
 from app.database.connection import async_session_factory
 from app.ai.ai_service import AIService
 from app.ai.schemas import AIRecommendationResponse
@@ -25,6 +25,7 @@ from app.config.settings import settings
 _weather_service = WeatherService()
 _location_service = LocationService()
 _ai_service = AIService(api_key=settings.GEMINI_API_KEY)
+_routing_service = RoutingService()
 
 SEVERITY_RANK = {"critical": 0, "severe": 1, "high": 2, "warning": 3, "advisory": 4, "info": 5}
 
@@ -146,26 +147,22 @@ async def route_node(state: AgentState) -> dict:
     if lat is not None and lng is not None and infra is not None:
         dest_type, dest_item = _pick_nearest_destination(lat, lng, infra)
 
-        try:
-            dist = _haversine(lat, lng, dest_item.latitude, dest_item.longitude) if dest_item else 0.0
-            duration_min = round((dist / 5.0) * 60, 1) if dist > 0 else 0.0
-
-            result: dict = {}
-            if dest_item:
-                result["destination"] = DestinationState(
-                    destination_type=dest_type,
-                    destination=dest_item,
+        if dest_item:
+            try:
+                route = await _routing_service.get_route(
+                    lat, lng,
+                    dest_item.latitude, dest_item.longitude,
+                    destination_type=dest_type or "destination",
                 )
-            result["route"] = RouteState(
-                distance_km=round(dist, 3),
-                duration_min=duration_min,
-                provider="straight-line",
-                directions=_build_directions(dest_type or "destination", dist),
-                coordinates=[[lat, lng], [dest_item.latitude, dest_item.longitude]] if dest_item else [],
-            )
-            return result
-        except Exception:
-            pass
+                return {
+                    "destination": DestinationState(
+                        destination_type=dest_type,
+                        destination=dest_item,
+                    ),
+                    "route": route,
+                }
+            except Exception:
+                pass
 
     return {
         "destination": DestinationState(),
@@ -318,14 +315,6 @@ def _pick_nearest_destination(
 
     candidates.sort(key=lambda pair: pair[1].distance if pair[1].distance is not None else float("inf"))
     return candidates[0]
-
-
-def _build_directions(destination_type: str, distance_km: float) -> list[str]:
-    steps = [f"Head towards the nearest {destination_type}"]
-    if distance_km > 1:
-        steps.append(f"Continue for approximately {distance_km:.1f} km")
-    steps.append("Arrive at destination")
-    return steps
 
 
 def _count_infrastructure(infra: InfrastructureState | None) -> int:

@@ -4,7 +4,7 @@
 
 **AIDRAC (Agentic AI Disaster Response Coordinator)** is a full-stack disaster management application that helps citizens during natural disasters such as floods, cyclones, and earthquakes. It provides safe evacuation routes, nearby shelters, hospitals, real-time weather information, and emergency alerts through an interactive geographic interface.
 
-The project is architected in phases. Phase 1 established the core platform (auth, database, CRUD APIs, mapping), and Phase 2 added real-time geolocation, routing, and GPS-based weather. Phase 3.1 added live infrastructure from OpenStreetMap (shelters, hospitals, police, fire stations, pharmacies). Phase 3.2 added AI Decision Support via the Gemini API. Phase 3.3A added live CAP alert ingestion from official IMD/NDMA feeds. Phase 3.3B/C added background ingestion, multi-source merging, alert history, caching, location-aware filtering, and disaster provider abstraction. Phase 3.3C migrated the Hospitals and Shelters pages from demo database records to live OpenStreetMap data. Phase 4.1 introduced the LangGraph orchestration foundation — a sequential workflow graph with placeholder nodes, isolated in `backend/app/langgraph/`. Phase 4.2 will add real agent intelligence.
+The project is architected in phases. Phase 1 established the core platform (auth, database, CRUD APIs, mapping), and Phase 2 added real-time geolocation, routing, and GPS-based weather. Phase 3.1 added live infrastructure from OpenStreetMap (shelters, hospitals, police, fire stations, pharmacies). Phase 3.2 added AI Decision Support via the Gemini API. Phase 3.3A added live CAP alert ingestion from official IMD/NDMA feeds. Phase 3.3B/C added background ingestion, multi-source merging, alert history, caching, location-aware filtering, and disaster provider abstraction. Phase 3.3C migrated the Hospitals and Shelters pages from demo database records to live OpenStreetMap data. Phase 4.1 introduced the LangGraph orchestration foundation with typed state. Phase 4.2 replaced placeholder nodes with real service-backed agents. Phase 4.3 added the Gemini-powered intelligent Coordinator with deterministic fallback. Phase 4.3.1 upgraded the AI Decision Support UI with structured cards, risk badges, and explainability. Phase 4.4 refactored the graph to parallel execution — Weather, Alert, and Infrastructure run concurrently via LangGraph's native fan-out.
 
 ---
 
@@ -72,11 +72,13 @@ aidrac/
 │   └── app/
 │       ├── __init__.py
 │       ├── main.py         # FastAPI app with lifespan (create tables + seed)
-│       ├── langgraph/        # LangGraph orchestration (Phase 4.1)
+│       ├── langgraph/        # LangGraph multi-agent orchestration
+│       │   ├── __init__.py       # Exports compiled graph
 │       │   ├── models.py         # Strongly typed Pydantic models
 │       │   ├── state.py          # Shared AgentState with typed fields
-│       │   ├── nodes.py          # Placeholder agent nodes
-│       │   └── graph.py          # StateGraph builder & compiled graph
+│       │   ├── nodes.py          # Service-backed agent nodes
+│       │   ├── graph.py          # Parallel graph builder & compiled graph
+│       │   └── context_builder.py# AgentState→LLM context (no service calls)
 │       ├── config/
 │       │   └── settings.py # Pydantic BaseSettings (env vars)
 │       ├── database/
@@ -201,7 +203,13 @@ aidrac/
 
 9. **Mock Fallback**: The weather service returns mock data when no API key is configured, enabling full local development without external dependencies.
 
-10. **LangGraph Orchestration (Phase 4.1)**: A `StateGraph`-based sequential workflow in `backend/app/langgraph/` provides the orchestration skeleton for future AI agents. The graph compiles a pipeline of 5 placeholder nodes (Weather → Alert → Infrastructure → Route → Coordinator). No existing services are modified — the package is a self-contained foundation. Phase 4.2 will replace placeholder nodes with real agent implementations that call existing services.
+10. **LangGraph Multi-Agent Architecture (Phases 4.1–4.4)**: `backend/app/langgraph/` implements a `StateGraph`-based multi-agent system. Phase 4.1 established the skeleton with typed `AgentState` (Pydantic models). Phase 4.2 replaced all placeholder nodes with real service-backed agents. Phase 4.3 added the Gemini-powered Coordinator with deterministic fallback detection. Phase 4.4 refactored to parallel execution: Weather, Alert, and Infrastructure agents fan out from START concurrently; Route fans in after all three complete; Coordinator runs last. All agents share `AgentState` — each writes to its own key (`weather`, `alerts`, `infrastructure`, `route`/`destination`, `recommendation`) with automatic state merging by LangGraph.
+
+11. **Gemini Coordinator with Deterministic Fallback (Phase 4.3)**: The Coordinator reuses the existing `AIService` from `app/ai/` — no duplicate Gemini client or system prompt. A LangGraph-specific `context_builder.py` converts `AgentState` into a compact LLM prompt without making service/DB/HTTP calls (data was already gathered by upstream agents). The Coordinator detects degraded AI responses (quota, auth, network failure) via `_is_degraded()` before falling back to a deterministic recommendation based solely on `AgentState`. The `RecommendationState.source` field tracks whether the recommendation came from "gemini" or "fallback".
+
+12. **Parallel Graph Execution (Phase 4.4)**: LangGraph's native fan-out/fan-in replaces the original sequential pipeline. Three edges from START (weather, alert, infrastructure) launch parallel execution. Edges from all three to `route` create an implicit barrier — Route executes only after all three upstream agents finish. Coordinator runs after Route. This reduces total execution time while preserving fault tolerance: any agent that fails returns empty typed state, and the graph continues with whatever data is available.
+
+13. **RoutingService Abstraction (Phase 4.5)**: `RoutingService` at `backend/app/services/routing_service.py` decouples the Route Agent from routing implementation. The service exposes a single `get_route(origin, dest, type) → RouteState` method. OSRM is the primary provider; Haversine straight-line is the automatic fallback. New providers can be added without modifying the Route Agent — follows the same architectural pattern as the `disaster_sources/` provider abstraction. The Route Agent calls `RoutingService.get_route()` and never knows which provider generated the route.
 
 ### Frontend Architecture
 
@@ -405,10 +413,58 @@ aidrac/
 - **New Package**: `backend/app/langgraph/` with `models.py`, `state.py`, `nodes.py`, `graph.py` — fully isolated from existing services
 - **Strongly Typed State**: `AgentState` is a Pydantic `BaseModel` with 8 typed sub-models (`LocationState`, `WeatherState`, `AlertItem`, `AlertState`, `InfrastructureItem`, `InfrastructureState`, `DestinationState`, `RouteState`, `RecommendationState`) instead of generic dicts — safer agent development with IDE autocompletion and runtime validation
 - **5 Placeholder Nodes**: weather, alert, infrastructure, route, coordinator — each logs execution and returns state unchanged
-- **Sequential Graph**: START → Weather → Alert → Infrastructure → Route → Coordinator → END (no branching yet)
+- **Sequential Graph**: START → Weather → Alert → Infrastructure → Route → Coordinator → END
 - **Module-Level Graph Instance**: `graph.py` exposes a compiled `graph` singleton importable by other modules
-- **Existing Code Untouched**: no routers, services, models, schemas, or frontend files were modified; `langgraph/` is a drop-in orchestration layer ready for Phase 4.2 agent intelligence
+- **Existing Code Untouched**: no routers, services, models, schemas, or frontend files were modified in Phase 4.1
 - **Test Coverage**: `tests/test_langgraph.py` verifies graph builds, sequential execution, and final state integrity
+
+### Phase 4.2 — Service-Backed LangGraph Agents
+- **Weather Agent**: calls `WeatherService.get_current_weather(lat, lng)`, returns `WeatherState` with inferred risk level via `_infer_weather_risk()` (temperature thresholds + description keywords). Falls back to empty `WeatherState()` on any exception.
+- **Alert Agent**: opens a DB session via `async_session_factory`, calls `AlertService.get_all(lat, lng)`. Maps results to `AlertItem[]` with severity ranking. Returns empty `AlertState()` on DB or service failure.
+- **Infrastructure Agent**: fires all 7 `LocationService` category queries in parallel via `asyncio.gather`. Maps each to `InfrastructureItem[]`. Returns empty `InfrastructureState()` on failure.
+- **Route Agent**: picks the nearest infrastructure item across all 7 categories using `_haversine()`. Computes straight-line distance and walking ETA (5 km/h). Produces `DestinationState` + `RouteState`.
+- **Coordinator Agent**: placeholder aggregator — builds summary and action list from upstream state. No Gemini call in Phase 4.2.
+- **New Helpers**: `_infer_weather_risk()`, `_pick_nearest_destination()`, `_build_directions()`, `_count_infrastructure()`, `_suggest_actions()` — all pure functions.
+- **`InfrastructureState` Expanded**: added `community_centres` and `schools` fields (previously missing from the model).
+- **Tests Updated**: `test_graph_executes_without_crashing()` now asserts typed model instances instead of key existence; new `test_graph_with_gps_coordinates()` verifies real service execution with GPS input.
+
+### Phase 4.3 — Intelligent Gemini Coordinator
+- **LangGraph Context Builder**: `build_llm_context(state: AgentState) → str` in `backend/app/langgraph/context_builder.py` — a pure function that reads ONLY from `AgentState`. Never calls services, DB, or HTTP. Outputs a compact LLM prompt: weather (condition + risk), alerts (count + severity + top 5 events), infrastructure (capped: 3 hospitals, 3 shelters, 2 police/fire/pharmacy), destination/route, and user question.
+- **Gemini Coordinator**: replaces the Phase 4.2 placeholder. Reuses existing `AIService.get_recommendation(question, context)` — no duplicate Gemini client or system prompt.
+- **Degraded Response Detection**: `_is_degraded()` checks `AIRecommendationResponse.summary` and `.reason` for known failure indicators ("not configured", "unavailable", "quota exceeded", etc.). Handles cases where AIService returns a degraded response instead of raising.
+- **Deterministic Fallback**: `_deterministic_recommendation()` generates recommendations using only `AgentState` — alert severity, weather risk, nearest facility, active alert count. Never allows the graph to crash on Gemini failure.
+- **`RecommendationState` Extended**: added `reasoning: str | None`, `recommended_destination: str | None`, `source: str` ("gemini" or "fallback").
+- **Logging**: `[Coordinator] Building LLM context`, `[Coordinator] Calling AIService`, `[Coordinator] AI recommendation parsed` / `[Coordinator] Using deterministic fallback`.
+
+### Phase 4.3.1 — AI Decision Support UI Upgrade
+- **Card-Based Layout**: recommendation displayed in separate visual cards (risk badge, summary, destination, reason, actions) instead of flat text
+- **Risk Badge**: color-coded by risk level (green=low, yellow=moderate, orange=high, red=critical, gray=unknown) with Shield icon
+- **Destination Card**: shows lucide icon (Hospital/Home/Shield/Building2/Flame/Pill), destination type label, and facility name in a blue card
+- **Action Checklist**: green checkmark icons instead of numbered circles
+- **Explainability Section**: collapsible "How this recommendation was generated" panel listing all 5 agents with checkmarks
+- **Live Data Sources Footer**: static "Powered by" section showing OpenWeather, IMD/NDMA CAP Alerts, OpenStreetMap, Gemini
+- **Loading State**: spinner + "Analyzing your situation..." while request is in flight; Analyze button disabled
+- **Empty State**: bot icon + "Ask anything about your safety" + 5 clickable example questions before first submission
+- **Error State**: friendly error message with "Try Again" retry button; no stack traces exposed
+- **Location Display**: current lat/lng shown below header when GPS available, "Location unavailable" otherwise
+
+### Phase 4.4 — Parallel LangGraph Execution
+- **Fan-out from START**: three edges (`START → weather`, `START → alert`, `START → infrastructure`) launch Weather, Alert, and Infrastructure concurrently via LangGraph's native graph orchestration
+- **Fan-in to Route**: edges from all three independent nodes to `route` create an implicit synchronization barrier — Route executes only after all three upstream agents complete
+- **Sequential Tail**: Route → Coordinator → END remains unchanged
+- **Fault Tolerance**: if one parallel branch fails (returns empty state), the other branches still complete; Coordinator runs with whatever data is available
+- **Orchestration Logging**: `[LangGraph] <Node> started` printed at each node entry, clearly demonstrating parallel execution of the first three agents
+- **No Business Logic Changes**: only `graph.py` edges changed and `nodes.py` print statements added; agent logic, services, APIs, models, and frontend untouched
+
+### Phase 4.5 — Routing Service Architecture
+- **RoutingService Abstraction**: `backend/app/services/routing_service.py` provides a single `get_route(origin_lat, origin_lng, dest_lat, dest_lng, destination_type) → RouteState` method. The Route Agent depends only on this interface — it never knows which provider generated the route.
+- **OSRM Provider** (primary): calls `https://router.project-osrm.org/route/v1/foot/` with `overview=full&geometries=geojson&steps=true`. Extracts distance (m→km), duration (s→min), full polyline (converted from `[lng,lat]` to `[lat,lng]`), and turn-by-turn instructions from `legs[0].steps[].maneuver.instruction`. Sets `provider="osrm"` on `RouteState`.
+- **Straight-Line Provider** (automatic fallback): uses `_haversine` from `location_service.py`. Computes straight-line distance and walking ETA (5 km/h). Generates 3-step directions. Sets `provider="straight-line"` on `RouteState`.
+- **Automatic Fallback**: if OSRM fails (timeout, HTTP error, invalid response, rate limiting, service unavailable), `RoutingService.get_route()` catches the exception, logs `[Routing] OSRM unavailable` / `[Routing] Falling back to straight-line`, and returns the straight-line result. The Route Agent never sees the failure.
+- **Route Agent Refactored**: `route_node` now calls `_routing_service.get_route(lat, lng, dest_item.latitude, dest_item.longitude, destination_type=...)` — no direct Haversine calls, no `_build_directions`, no manual `RouteState` construction. Destination selection logic (`_pick_nearest_destination`) remains in the agent.
+- **Dead Code Removed**: `_build_directions()` removed from `nodes.py` — its logic moved into `RoutingService._straight_line_route()`.
+- **Extensible**: future providers (GraphHopper, ORS, Google Directions, Mapbox) can be added to `RoutingService` without changing the Route Agent — just add a `_provider_name_route()` method and insert it in the priority chain.
+- **Logging**: `[Routing] Calling OSRM`, `[Routing] Provider: OSRM`, `[Routing] OSRM unavailable`, `[Routing] Falling back to straight-line`.
 
 ### Phase 3.3B/C — Background Ingestion & Alert Pipeline
 - **Background Refresh**: IMD and NDMA feeds fetched concurrently every 5 minutes via asyncio background task started in FastAPI lifespan. `GET /api/alerts` reads only from PostgreSQL — zero network requests on reads.
@@ -516,15 +572,15 @@ docker-compose up --build
 
 ---
 
-## Phase 3.3+ Roadmap
+## Phase 4.6+ Roadmap
 
-The architecture is designed for extension with Agentic AI in Phase 3.3+:
+The architecture is designed for further extension:
 
-- **LangGraph/CrewAI integration** for autonomous disaster response coordination
-- **LLM-powered decision support** for resource allocation
-- **Predictive analytics** for disaster forecasting
-- **Multi-agent coordination** for dynamic shelter assignment and evacuation planning
-- **Natural language interface** for emergency reporting and inquiry
-- **Polygon-based alert filtering** replacing the current area/state string matching strategy
+- **Memory/Persistence** — LangGraph checkpointer for multi-turn conversations and state persistence across sessions
+- **Agent Observability** — LangSmith integration for tracing, monitoring, and debugging agent execution
+- **Human-in-the-Loop** — breakpoints for coordinator approval before critical recommendations
+- **Multi-turn Conversations** — agent remembers past questions and context across sessions
+- **Additional Agents** — resource allocation agent, population density agent, weather forecasting agent
+- **Polygon-based alert filtering** — replacing the current area/state string matching strategy
 
 The existing service layer, typed API schemas, and modular component structure are intentionally designed to be consumed by AI agents without architectural changes.

@@ -1195,3 +1195,118 @@ Created `backend/app/services/disaster_sources/`:
 - `RouteInfo` provider field enables agent awareness of data quality
 - Mock data fallbacks enable AI development without external API dependencies
 - Provider architecture (`disaster_sources/`) enables data source swap without endpoint changes
+
+---
+
+## Phase 4.3.1 — AI Decision Support UI Upgrade
+
+**Objective:** Upgrade the existing AI Decision Support component on the Dashboard with a polished card-based layout. Frontend-only — no backend changes.
+
+### 4.3.1.1 Card-Based Recommendation Layout
+
+**Changes to `frontend/src/components/AIAssistant.tsx`:**
+- **Risk Badge**: color-coded badge (green/yellow/orange/red/gray) with Shield icon mapping `riskLevel` from backend
+- **Summary Card**: gray background card with leading-relaxed text
+- **Destination Card**: blue card with lucide icon (Hospital/Home/Shield/Building2/Flame/Pill depending on destination type), type label, and facility name
+- **Reason Card**: white card with "Reason" header and explanation text
+- **Actions Checklist**: green `Check` icon in a green circle for each recommended action
+- **Explainability Section**: collapsible `<button>` panel (ChevronDown/ChevronUp toggles) showing all 5 agents (Weather, Alert, Infrastructure, Route, Gemini Coordinator) with green checkmarks — informational only, no API calls
+- **Live Data Sources Footer**: static "Powered by" row showing OpenWeather, IMD/NDMA CAP Alerts, OpenStreetMap, Gemini
+- **Empty State**: before first submission, shows Bot icon + "Ask anything about your safety" + 5 clickable example questions
+- **Loading State**: `Loader2` spinner in button (disabled) + `LoadingSpinner` below + "Analyzing your situation..."
+- **Error State**: friendly error message + "Try Again" retry button; no stack traces
+- **Location Display**: `📍 Current Location: lat, lng` when GPS available, "Location unavailable" otherwise
+
+### 4.3.1.2 What Was NOT Changed
+- Backend — no files touched
+- LangGraph — no files touched
+- Existing REST APIs — unchanged
+- Graph topology — unchanged
+- Agent logic — unchanged
+- `AIAssistant.tsx` is the only modified file
+
+---
+
+## Phase 4.4 — Parallel LangGraph Execution
+
+**Objective:** Refactor the LangGraph graph topology so that independent agents (Weather, Alert, Infrastructure) execute concurrently using LangGraph's native fan-out/fan-in, reducing total execution time while preserving identical functionality.
+
+### 4.4.1 Graph Topology Change
+
+**Changes to `backend/app/langgraph/graph.py`:**
+- Replaced linear chain with parallel topology:
+  - `START → weather`, `START → alert`, `START → infrastructure` — fan-out (parallel launch)
+  - `weather → route`, `alert → route`, `infrastructure → route` — fan-in (synchronization barrier)
+  - `route → coordinator → END` — sequential tail (unchanged)
+- Uses LangGraph's native state merging — each node writes to different keys (`weather`, `alerts`, `infrastructure`), so parallel state updates merge automatically without conflicts
+
+### 4.4.2 Orchestration Logging
+
+**Changes to `backend/app/langgraph/nodes.py`:**
+- Added `print("[LangGraph] Weather started")`, `print("[LangGraph] Alert started")`, etc. at the entry of each node
+- Log output clearly demonstrates the first three agents starting concurrently:
+  ```
+  [LangGraph] Alert started
+  [LangGraph] Infrastructure started
+  [LangGraph] Weather started
+  ...
+  [LangGraph] Route started
+  [LangGraph] Coordinator started
+  ```
+
+### 4.4.3 What Was NOT Changed
+- Weather, Alert, Infrastructure, Route, Coordinator business logic — unchanged
+- `AgentState` — unchanged
+- `models.py` — unchanged
+- `context_builder.py` — unchanged
+- Any REST APIs, frontend code, or external services — unchanged
+- Test assertions remain identical (all 4 tests pass)
+- Recommendation behavior — functionally identical to Phase 4.3
+
+### 4.4.4 Fault Tolerance
+- If Weather fails (returns empty `WeatherState()`), Alert and Infrastructure still complete
+- If Infrastructure fails, Route still executes (with empty infrastructure data)
+- No parallel branch failure can crash the graph
+- Coordinator runs with whatever state is available
+
+---
+
+## Phase 4.5 — Routing Service Architecture
+
+**Objective:** Refactor the routing layer so the Route Agent no longer performs routing directly. Introduce a reusable `RoutingService` abstraction with OSRM as primary provider and Haversine straight-line as automatic fallback.
+
+### 4.5.1 RoutingService
+
+**Created `backend/app/services/routing_service.py`:**
+- `RoutingService.get_route(origin_lat, origin_lng, dest_lat, dest_lng, destination_type) → RouteState` — single public method, returns typed `RouteState`
+- **OSRM Provider** (`_osrm_route`): calls `https://router.project-osrm.org/route/v1/foot/{lng},{lat};{lng},{lat}?overview=full&geometries=geojson&steps=true` via `httpx.AsyncClient` with 10s timeout. Extracts:
+  - `distance_km` from route distance (meters → km)
+  - `duration_min` from route duration (seconds → minutes)
+  - `coordinates` from GeoJSON geometry (converted `[lng,lat]` → `[lat,lng]`)
+  - `directions` from `legs[0].steps[].maneuver.instruction`
+  - Sets `provider="osrm"`
+- **Straight-Line Provider** (`_straight_line_route`): uses existing `_haversine` from `location_service.py`. Computes distance, walking ETA (5 km/h), generates 3-step directions. Sets `provider="straight-line"`.
+- **Automatic Fallback**: `get_route()` wraps OSRM in try/except. On any exception (timeout, HTTP error, rate limiting), logs `[Routing] OSRM unavailable` / `[Routing] Falling back to straight-line` and returns the straight-line result. The Route Agent never sees the failure.
+
+### 4.5.2 Route Agent Refactored
+
+**Changes to `backend/app/langgraph/nodes.py`:**
+- Removed `import ... _haversine` from `location_service`; replaced with `from app.services.routing_service import RoutingService`
+- Added `_routing_service = RoutingService()` module-level instance
+- `route_node` now calls `await _routing_service.get_route(lat, lng, dest_item.latitude, dest_item.longitude, destination_type=...)` and uses the returned `RouteState` directly
+- Removed `import math` (no longer needed)
+- Removed `_build_directions()` helper — its logic moved into `RoutingService._straight_line_route()`
+
+### 4.5.3 What Was NOT Changed
+- `RouteState` model — preserved unchanged
+- `AgentState` — unchanged
+- LangGraph graph topology — unchanged
+- Other agents (Weather, Alert, Infrastructure, Coordinator) — unchanged
+- `_pick_nearest_destination()` helper — unchanged (destination selection stays in the Route Agent)
+- All REST APIs — unchanged
+- Frontend — unchanged
+- Database — unchanged
+
+### 4.5.4 Extensibility
+
+Future providers (GraphHopper, OpenRouteService, Google Directions, Mapbox) can be added by creating a `_provider_route()` method and inserting it into the priority chain. The Route Agent never needs changes when providers are added or removed.
