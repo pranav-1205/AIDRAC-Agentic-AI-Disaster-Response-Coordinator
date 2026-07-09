@@ -1068,19 +1068,127 @@ Created `backend/app/services/disaster_sources/`:
 
 ---
 
-### Phase 3.3B — LangGraph Shelter Agent (Planned)
-- AI-driven safe destination scoring using disaster type, weather severity, road accessibility, and shelter capacity
-- Dynamic re-scoring based on live CAP alert context
-- Automated shelter assignment during evacuations
+## Phase 4.1 — LangGraph Foundation
 
-### Phase 3.4 — Agentic AI (Planned)
-- LangGraph/CrewAI integration for multi-agent coordination
-- LLM-powered decision support for resource allocation
-- Natural language interface for emergency reporting
-- Predictive analytics for disaster forecasting
-- Real-time resource tracking and optimization
+**Objective:** Introduce the LangGraph orchestration framework into the architecture. No agent intelligence — only the graph skeleton, shared state, and placeholder nodes.
 
-### Architecture Considerations for Phase 3
+### 4.1.1 New Package Structure
+
+**Changes:**
+- Created `backend/app/langgraph/` with four files:
+  - `__init__.py` — exports compiled `graph` singleton for external imports
+  - `state.py` — `AgentState` TypedDict with 9 fields: `user_question`, `latitude`, `longitude`, `weather`, `alerts`, `nearby_infrastructure`, `selected_destination`, `route`, `final_recommendation`
+  - `nodes.py` — 5 async placeholder functions (`weather_node`, `alert_node`, `infrastructure_node`, `route_node`, `coordinator_node`), each logs `[langgraph] <name> node executed` and returns an empty dict (no state mutation)
+  - `graph.py` — builds a `StateGraph(AgentState)`, registers all 5 nodes in sequence (START → weather → alert → infrastructure → route → coordinator → END), compiles the graph, and exports a module-level `graph` instance
+
+**Key Files:**
+- `backend/app/langgraph/__init__.py`
+- `backend/app/langgraph/state.py`
+- `backend/app/langgraph/nodes.py`
+- `backend/app/langgraph/graph.py`
+
+### 4.1.2 Dependency
+
+**Changes:**
+- Added `langgraph>=1.2.0` to `backend/requirements.txt`
+- No existing packages removed
+
+**Key Files:**
+- `backend/requirements.txt`
+
+### 4.1.3 Testing
+
+**Changes:**
+- Created `tests/test_langgraph.py` with two tests:
+  - `test_graph_builds()` — asserts the compiled graph contains the 5 expected nodes (excluding internal `__start__`)
+  - `test_graph_executes()` — invokes the graph with a full initial state, verifies all nodes run in sequence, and asserts final state keys match `AgentState`
+
+**Key Files:**
+- `backend/tests/test_langgraph.py`
+
+### 4.1.4 Documentation
+
+**Changes:**
+- Updated `README.md`: added `langgraph/` to project structure, Phase 4.1 feature list, updated roadmap to Phase 4.2+
+- Updated `docs/PROJECT_CONTEXT.md`: added Phase 4.1 to overview, project structure, architecture decisions (new decision #10), and features section
+- Updated `docs/CHANGELOG_AI.md`: this entry
+
+**Key Files:**
+- `README.md`
+- `docs/PROJECT_CONTEXT.md`
+- `docs/CHANGELOG_AI.md`
+
+### 4.1.6 Strongly Typed State Models
+
+**Objective:** Replace generic dict-based workflow state with strongly typed Pydantic models for type safety, IDE autocompletion, and runtime validation.
+
+**Changes:**
+- Created `models.py` with 9 Pydantic models: `LocationState`, `WeatherState`, `AlertItem`, `AlertState`, `InfrastructureItem`, `InfrastructureState`, `DestinationState`, `RouteState`, `RecommendationState`
+- Each model has explicit typed fields with sensible defaults (all sub-states are `Optional` to keep placeholder nodes working)
+- `AgentState` in `state.py` converted from `TypedDict` to `Pydantic BaseModel` — fields now reference the typed models instead of `dict[str, Any]`
+- `__init__.py` expanded to export all models for convenient importing
+- Graph topology, node order, node logic — all unchanged
+- Nodes still receive state as strongly typed `AgentState` instances from LangGraph
+- Tests updated: added `test_agent_state_typed()` verifying field types, `test_models_accept_data()` demonstrating construction and access, and `test_graph_executes_with_typed_state()` confirming graph execution with typed state
+
+**Key Files:**
+- `backend/app/langgraph/models.py` (new)
+- `backend/app/langgraph/state.py` (updated)
+- `backend/app/langgraph/__init__.py` (updated)
+- `backend/tests/test_langgraph.py` (updated)
+
+### 4.1.5 What Was NOT Changed
+- No existing routers, services, models, schemas, or utilities were modified
+- No existing AI package (`app/ai/`) was touched
+- No frontend code was changed
+- No business logic, API calls, or Gemini integration was added
+- The `langgraph/` package is a self-contained orchestration foundation — ready for Phase 4.2 agent intelligence
+
+---
+
+## Phase 4.2 — Real Service-Backed LangGraph Agents
+
+**Objective:** Replace placeholder LangGraph nodes with real service-backed agents. Each node now calls the corresponding service layer, handles errors gracefully, and returns properly typed state.
+
+### 4.2.1 Service-Backed Agents
+
+**Changes to `nodes.py`:**
+- **Weather Node** (`weather_node`): Instantiates `WeatherService` at module level. Calls `get_current_weather(lat, lng)` when GPS coordinates are available. Returns `WeatherState` with temperature, feels_like, humidity, wind_speed, rain, description, city, and inferred risk_level (`_infer_weather_risk`). On error, returns empty `WeatherState()`.
+- **Alert Node** (`alert_node`): Opens a DB session via `async_session_factory`, calls `AlertService.get_all(lat, lng)`. Maps results to `AlertItem[]` with id, event, severity, headline, description, area, source. Computes `highest_severity` by ranking. On error (no DB, service failure), returns empty `AlertState()`.
+- **Infrastructure Node** (`infrastructure_node`): Instantiates `LocationService` at module level. Fires all 7 category queries in parallel via `asyncio.gather`: hospitals, shelters, community_centres, schools, police, firestations, pharmacies. Maps each to `InfrastructureItem[]`. On error, returns empty `InfrastructureState()`.
+- **Route Node** (`route_node`): Picks the nearest infrastructure item (across all categories) using `_haversine` from `location_service.py`. Computes distance, estimated walking duration (5 km/h), builds `DestinationState` with destination_type and item, and `RouteState` with distance_km, duration_min, provider ("straight-line"), directions, and coordinates polyline. On error, returns empty `DestinationState()` + `RouteState()`.
+- **Coordinator Node** (`coordinator_node`): Aggregates all upstream state. Produces `RecommendationState` with summary, actions (based on severity/risk), and risk_level. No Gemini call — pure placeholder summarization.
+
+**New helpers:**
+- `_infer_weather_risk(data)` — maps temperature ranges and description keywords to risk levels (extreme/high/moderate/low)
+- `_pick_nearest_destination(lat, lng, infra)` — scans all 7 categories for the closest item
+- `_build_directions(type, distance)` — returns step-by-step text directions
+- `_count_infrastructure(infra)` — total count across all categories
+- `_suggest_actions(state)` — generates 1-3 action items based on alert severity, weather risk, and nearest facility
+
+### 4.2.2 InfrastructureState Expansion
+
+**Changes to `models.py`:**
+- Added `community_centres: list[InfrastructureItem] = []` field
+- Added `schools: list[InfrastructureItem] = []` field
+- Both use `Field(default_factory=list)` for mutable default safety
+
+### 4.2.3 Updated Tests
+
+**Changes to `tests/test_langgraph.py`:**
+- `test_graph_executes_without_crashing()`: now asserts every state field is a proper typed model instance (e.g., `isinstance(result["weather"], WeatherState)`) instead of checking keys exist
+- `test_graph_with_gps_coordinates()`: passes real GPS coordinates (Delhi: 28.6139, 77.2090), verifies services execute and return typed state even when external APIs fail
+- `test_coordinator_populates_summary()`: verifies `recommendation.summary` contains "All agents completed" and `recommendation.actions` is a non-empty list
+
+### 4.2.4 What Was NOT Changed
+- Graph topology (START → weather → alert → infrastructure → route → coordinator → END) — unchanged
+- `AgentState` model in `state.py` — unchanged
+- `graph.py` build/compile logic — unchanged
+- Any REST APIs, frontend code, or external services — unchanged
+- No Gemini integration in the Coordinator (still a placeholder)
+- No new Python dependencies required
+
+---
 - Service layer already decoupled from HTTP — AI agents can call services directly
 - Typed Pydantic schemas provide structured I/O for agent tool definitions
 - `GeolocationState` and `NearestItem` types are agent-consumable

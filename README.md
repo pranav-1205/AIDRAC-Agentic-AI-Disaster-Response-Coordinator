@@ -29,6 +29,11 @@ aidrac/
 ├── backend/
 │   ├── app/
 │   │   ├── ai/               # AI Decision Support (Gemini)
+│   │   ├── langgraph/        # LangGraph orchestration (Phase 4.1)
+│   │   │   ├── models.py         # Strongly typed Pydantic models
+│   │   │   ├── state.py          # Shared AgentState with typed fields
+│   │   │   ├── nodes.py          # Placeholder agent nodes
+│   │   │   └── graph.py          # Graph builder & compiled graph
 │   │   │   ├── prompts.py        # System prompt
 │   │   │   ├── context_builder.py# Context collection & normalization
 │   │   │   ├── ai_service.py     # Gemini client & response parsing
@@ -117,6 +122,14 @@ aidrac/
 - **Location-Aware Filtering** — `GET /api/alerts?lat=&lng=` returns alerts matching the user's state/area via area string matching; designed for future polygon-based filtering
 - **Demo Data Cleanup** — seed.py no longer creates demo alerts; existing demo alerts marked inactive on first background run; ContextBuilder filters to CAP-only alerts
 - **DisasterProvider Abstraction** — `DisasterProvider` interface with `StaticDisasterProvider` for development data; ready for live disaster API sources
+
+### Phase 4.1 (Complete)
+- **LangGraph Foundation** — introduced `backend/app/langgraph/` package with `StateGraph`-based sequential workflow
+- **Strongly Typed State** — `AgentState` uses Pydantic `BaseModel` with 8 typed sub-models (`LocationState`, `WeatherState`, `AlertState`, `InfrastructureState`, `DestinationState`, `RouteState`, `RecommendationState`) instead of generic `dict[str, Any]`
+- **5 Placeholder Nodes** — Weather, Alert, Infrastructure, Route, Coordinator — each logs execution and returns state unchanged (no business logic yet)
+- **Sequential Pipeline** — START → Weather → Alert → Infrastructure → Route → Coordinator → END
+- **Isolated Package** — no existing services, APIs, or frontend code modified; `langgraph/` is a self-contained orchestration foundation
+- **Installed Dependency** — `langgraph>=1.2.0` added to `requirements.txt`
 
 ### Phase 3.3C (Complete)
 - **Live OSM Hospitals Page** — `/hospitals` now uses `GET /api/location/nearby` with GPS position to show live hospitals from OpenStreetMap, sorted by distance, with distance, coordinates, and OSM tags displayed
@@ -227,8 +240,9 @@ docker-compose up --build
 - **Admin:** admin@aidrac.com / admin123
 - **User:** user@aidrac.com / user123
 
-## Phase 3.3+ Roadmap
-- LangGraph Shelter Agent — AI-driven safe destination scoring using disaster type, weather severity, road accessibility, and shelter capacity
-- Autonomous disaster response coordination
-- Predictive analytics for disaster forecasting
-- Multi-agent coordination for resource allocation
+## Phase 4.2+ Roadmap
+- Weather Agent — real OpenWeather API integration via LangGraph node
+- Alert Agent — live CAP alert context enrichment
+- Infrastructure Agent — Overpass-based nearby facility selection
+- Route Agent — routing computation with provider fallback
+- Coordinator Agent — Gemini-powered final recommendation generation

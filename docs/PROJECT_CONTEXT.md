@@ -4,7 +4,7 @@
 
 **AIDRAC (Agentic AI Disaster Response Coordinator)** is a full-stack disaster management application that helps citizens during natural disasters such as floods, cyclones, and earthquakes. It provides safe evacuation routes, nearby shelters, hospitals, real-time weather information, and emergency alerts through an interactive geographic interface.
 
-The project is architected in phases. Phase 1 established the core platform (auth, database, CRUD APIs, mapping), and Phase 2 added real-time geolocation, routing, and GPS-based weather. Phase 3.1 added live infrastructure from OpenStreetMap (shelters, hospitals, police, fire stations, pharmacies). Phase 3.2 added AI Decision Support via the Gemini API. Phase 3.3A added live CAP alert ingestion from official IMD/NDMA feeds. Phase 3.3B/C added background ingestion, multi-source merging, alert history, caching, location-aware filtering, and disaster provider abstraction. Phase 3.3C migrated the Hospitals and Shelters pages from demo database records to live OpenStreetMap data. Phase 3.3+ will introduce Agentic AI orchestration.
+The project is architected in phases. Phase 1 established the core platform (auth, database, CRUD APIs, mapping), and Phase 2 added real-time geolocation, routing, and GPS-based weather. Phase 3.1 added live infrastructure from OpenStreetMap (shelters, hospitals, police, fire stations, pharmacies). Phase 3.2 added AI Decision Support via the Gemini API. Phase 3.3A added live CAP alert ingestion from official IMD/NDMA feeds. Phase 3.3B/C added background ingestion, multi-source merging, alert history, caching, location-aware filtering, and disaster provider abstraction. Phase 3.3C migrated the Hospitals and Shelters pages from demo database records to live OpenStreetMap data. Phase 4.1 introduced the LangGraph orchestration foundation — a sequential workflow graph with placeholder nodes, isolated in `backend/app/langgraph/`. Phase 4.2 will add real agent intelligence.
 
 ---
 
@@ -72,6 +72,11 @@ aidrac/
 │   └── app/
 │       ├── __init__.py
 │       ├── main.py         # FastAPI app with lifespan (create tables + seed)
+│       ├── langgraph/        # LangGraph orchestration (Phase 4.1)
+│       │   ├── models.py         # Strongly typed Pydantic models
+│       │   ├── state.py          # Shared AgentState with typed fields
+│       │   ├── nodes.py          # Placeholder agent nodes
+│       │   └── graph.py          # StateGraph builder & compiled graph
 │       ├── config/
 │       │   └── settings.py # Pydantic BaseSettings (env vars)
 │       ├── database/
@@ -195,6 +200,8 @@ aidrac/
 8. **JWT Auth**: Access tokens contain `sub` (user ID) and `role` claims. Token extraction via `HTTPBearer`. Admin routes protected by `require_admin` dependency.
 
 9. **Mock Fallback**: The weather service returns mock data when no API key is configured, enabling full local development without external dependencies.
+
+10. **LangGraph Orchestration (Phase 4.1)**: A `StateGraph`-based sequential workflow in `backend/app/langgraph/` provides the orchestration skeleton for future AI agents. The graph compiles a pipeline of 5 placeholder nodes (Weather → Alert → Infrastructure → Route → Coordinator). No existing services are modified — the package is a self-contained foundation. Phase 4.2 will replace placeholder nodes with real agent implementations that call existing services.
 
 ### Frontend Architecture
 
@@ -393,6 +400,15 @@ aidrac/
 - **Backward Compatible**: existing `AlertService.get_all()` and `get_active()` filter out inactive and expired alerts; `POST /api/alerts` unchanged; ContextBuilder filters to CAP-only alerts
 - **Error Resilience**: both feeds attempted concurrently; if both fail → empty alerts returned; never crashes
 - **Weather Unchanged**: `GET /api/weather` continues using existing `WeatherService`; `OpenWeatherProvider` wrapper available for future use
+
+### Phase 4.1 — LangGraph Foundation
+- **New Package**: `backend/app/langgraph/` with `models.py`, `state.py`, `nodes.py`, `graph.py` — fully isolated from existing services
+- **Strongly Typed State**: `AgentState` is a Pydantic `BaseModel` with 8 typed sub-models (`LocationState`, `WeatherState`, `AlertItem`, `AlertState`, `InfrastructureItem`, `InfrastructureState`, `DestinationState`, `RouteState`, `RecommendationState`) instead of generic dicts — safer agent development with IDE autocompletion and runtime validation
+- **5 Placeholder Nodes**: weather, alert, infrastructure, route, coordinator — each logs execution and returns state unchanged
+- **Sequential Graph**: START → Weather → Alert → Infrastructure → Route → Coordinator → END (no branching yet)
+- **Module-Level Graph Instance**: `graph.py` exposes a compiled `graph` singleton importable by other modules
+- **Existing Code Untouched**: no routers, services, models, schemas, or frontend files were modified; `langgraph/` is a drop-in orchestration layer ready for Phase 4.2 agent intelligence
+- **Test Coverage**: `tests/test_langgraph.py` verifies graph builds, sequential execution, and final state integrity
 
 ### Phase 3.3B/C — Background Ingestion & Alert Pipeline
 - **Background Refresh**: IMD and NDMA feeds fetched concurrently every 5 minutes via asyncio background task started in FastAPI lifespan. `GET /api/alerts` reads only from PostgreSQL — zero network requests on reads.
