@@ -39,6 +39,7 @@ _DEGRADED_INDICATORS = (
 
 
 async def weather_node(state: AgentState) -> dict:
+    print("[LangGraph] Weather started")
     lat = state.location.latitude if state.location else None
     lng = state.location.longitude if state.location else None
 
@@ -65,6 +66,7 @@ async def weather_node(state: AgentState) -> dict:
 
 
 async def alert_node(state: AgentState) -> dict:
+    print("[LangGraph] Alert started")
     lat = state.location.latitude if state.location else None
     lng = state.location.longitude if state.location else None
 
@@ -101,6 +103,7 @@ async def alert_node(state: AgentState) -> dict:
 
 
 async def infrastructure_node(state: AgentState) -> dict:
+    print("[LangGraph] Infrastructure started")
     lat = state.location.latitude if state.location else None
     lng = state.location.longitude if state.location else None
 
@@ -135,6 +138,7 @@ async def infrastructure_node(state: AgentState) -> dict:
 
 
 async def route_node(state: AgentState) -> dict:
+    print("[LangGraph] Route started")
     lat = state.location.latitude if state.location else None
     lng = state.location.longitude if state.location else None
     infra = state.infrastructure
@@ -170,6 +174,7 @@ async def route_node(state: AgentState) -> dict:
 
 
 async def coordinator_node(state: AgentState) -> dict:
+    print("[LangGraph] Coordinator started")
     print("[Coordinator] Building LLM context")
     context = build_llm_context(state)
 

@@ -19,8 +19,10 @@ def build_graph() -> StateGraph:
     builder.add_node("coordinator", coordinator_node)
 
     builder.add_edge(START, "weather")
-    builder.add_edge("weather", "alert")
-    builder.add_edge("alert", "infrastructure")
+    builder.add_edge(START, "alert")
+    builder.add_edge(START, "infrastructure")
+    builder.add_edge("weather", "route")
+    builder.add_edge("alert", "route")
     builder.add_edge("infrastructure", "route")
     builder.add_edge("route", "coordinator")
     builder.add_edge("coordinator", END)
