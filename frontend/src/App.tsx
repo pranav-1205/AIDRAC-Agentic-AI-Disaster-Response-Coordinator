@@ -11,7 +11,8 @@ import Admin from './pages/Admin';
 import NotFound from './pages/NotFound';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './components/AppLayout';
-import LoadingSpinner from './components/LoadingSpinner';
+import LoadingSpinner from './components/ui/LoadingSpinner';
+import NotificationManager from './components/NotificationManager';
 
 const MapPage = lazy(() => import('./pages/MapPage'));
 
@@ -29,7 +30,9 @@ function SuspenseWrapper({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <NotificationManager />
+      <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -85,5 +88,6 @@ export default function App() {
       />
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </>
   );
 }

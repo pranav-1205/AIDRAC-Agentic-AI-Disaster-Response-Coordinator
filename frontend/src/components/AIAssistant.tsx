@@ -1,20 +1,28 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-  Send, Bot, Shield, MapPin, ChevronDown, ChevronUp, Check, AlertTriangle, Loader2,
+  Send, Bot, Shield, MapPin, ChevronDown, ChevronUp, Check, AlertTriangle,
   Hospital, Home, Building2, Flame, Pill,
 } from 'lucide-react';
 import { aiApi } from '../services/api';
 import { useGeolocation } from '../hooks/useGeolocation';
 import type { AIRecommendationResponse } from '../types';
-import LoadingSpinner from './LoadingSpinner';
+import Button from './ui/Button';
+import Badge from './ui/Badge';
+import LoadingSpinner from './ui/LoadingSpinner';
 
-const RISK_STYLES: Record<string, { bg: string; text: string; border: string; label: string }> = {
-  low:       { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', label: 'Low' },
-  moderate:  { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', label: 'Moderate' },
-  high:      { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', label: 'High' },
-  critical:  { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', label: 'Critical' },
+const RISK_VARIANTS: Record<string, 'danger' | 'warning' | 'info' | 'default'> = {
+  low: 'default',
+  moderate: 'info',
+  high: 'warning',
+  critical: 'danger',
 };
-const UNKNOWN_RISK = { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200', label: 'Unknown' };
+
+const RISK_LABELS: Record<string, string> = {
+  low: 'Low',
+  moderate: 'Moderate',
+  high: 'High',
+  critical: 'Critical',
+};
 
 const DEST_ICONS: Record<string, React.ReactNode> = {
   hospital:        <Hospital className="h-6 w-6" />,
@@ -38,21 +46,33 @@ const DEST_LABELS: Record<string, string> = {
   pharmacy:         'Pharmacy',
 };
 
-const EXAMPLE_QUESTIONS = [
-  'Is it safe to stay here?',
-  'Should I evacuate?',
-  'Where is the nearest safe place?',
-  'What should I do if flooding starts?',
-  'Is it safe to travel?',
-];
+interface AIAssistantProps {
+  initialQuestion?: string;
+  className?: string;
+}
 
-export default function AIAssistant() {
+export default function AIAssistant({ initialQuestion, className = '' }: AIAssistantProps) {
   const { position } = useGeolocation({ watch: false });
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AIRecommendationResponse | null>(null);
   const [explainOpen, setExplainOpen] = useState(false);
+  const submittedRef = useRef<string>('');
+
+  useEffect(() => {
+    if (initialQuestion && initialQuestion !== submittedRef.current) {
+      setQuestion(initialQuestion);
+      submittedRef.current = initialQuestion;
+    }
+  }, [initialQuestion]);
+
+  useEffect(() => {
+    if (question && question === submittedRef.current && submittedRef.current && !loading && !result && !error) {
+      handleSubmit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question]);
 
   const handleSubmit = async () => {
     const q = question.trim();
@@ -83,28 +103,23 @@ export default function AIAssistant() {
   };
 
   const riskKey = (result?.riskLevel ?? '').toLowerCase();
-  const riskStyle = RISK_STYLES[riskKey] || UNKNOWN_RISK;
+  const riskVariant = RISK_VARIANTS[riskKey] || 'default';
 
   const destType = (result?.recommendedDestination?.type ?? '').toLowerCase();
   const destIcon = DEST_ICONS[destType];
   const destLabel = DEST_LABELS[destType] || result?.recommendedDestination?.type || 'Location';
 
   return (
-    <div className="card">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-        <Bot className="h-5 w-5 text-primary-500" />
-        AI Decision Support
-      </h2>
-
-      <div className="flex items-center gap-2 mb-4 text-xs text-gray-500">
-        <MapPin className="h-3.5 w-3.5" />
+    <div className={className}>
+      <div className="flex items-center gap-2 mb-5 text-sm text-on-surface-variant">
+        <MapPin className="h-4 w-4" />
         {position
           ? <>Current Location: {position.lat.toFixed(4)}, {position.lng.toFixed(4)}</>
-          : <span className="text-gray-400">Location unavailable</span>
+          : <span className="text-on-surface-variant/60">Location unavailable</span>
         }
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-3 mb-5">
         <input
           type="text"
           value={question}
@@ -112,93 +127,77 @@ export default function AIAssistant() {
           onKeyDown={handleKeyDown}
           placeholder="Ask about evacuations, safe routes, resource allocation..."
           disabled={loading}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+          className="w-full px-5 py-3.5 bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl text-base text-on-surface placeholder:text-slate-400 transition-all duration-200 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:bg-slate-800/80 disabled:opacity-50 disabled:bg-slate-900"
         />
-        <button
-          onClick={handleSubmit}
-          disabled={loading || !question.trim()}
-          className="flex items-center gap-1.5 px-4 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors disabled:opacity-50 cursor-pointer"
-        >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        <Button size="lg" onClick={handleSubmit} loading={loading} disabled={!question.trim()} icon={<Send className="h-5 w-5" />}>
           Analyze
-        </button>
+        </Button>
       </div>
 
       {loading && (
         <div className="flex flex-col items-center py-8">
           <LoadingSpinner size="md" />
-          <p className="mt-4 text-sm text-gray-500">Analyzing your situation...</p>
+          <p className="mt-4 text-base text-on-surface-variant">Analyzing your situation...</p>
         </div>
       )}
 
       {!loading && error && (
         <div className="flex flex-col items-center py-8 text-center">
-          <AlertTriangle className="h-10 w-10 text-red-400 mb-3" />
-          <p className="text-sm text-gray-600 mb-4">{error}</p>
-          <button onClick={handleSubmit} className="btn-primary cursor-pointer">Try Again</button>
+          <AlertTriangle className="h-10 w-10 text-danger-500 mb-3" />
+          <p className="text-base text-on-surface mb-4">{error}</p>
+          <Button variant="primary" size="md" onClick={handleSubmit}>Try Again</Button>
         </div>
       )}
 
       {!loading && !error && !result && (
         <div className="flex flex-col items-center py-8 text-center">
-          <Bot className="h-10 w-10 text-gray-300 mb-3" />
-          <p className="text-sm text-gray-500 mb-4">Ask anything about your safety.</p>
-          <div className="space-y-1.5">
-            {EXAMPLE_QUESTIONS.map((ex) => (
-              <button
-                key={ex}
-                onClick={() => { setQuestion(ex); }}
-                className="block w-full text-left px-4 py-2 text-sm text-gray-500 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200 cursor-pointer"
-              >
-                {ex}
-              </button>
-            ))}
-          </div>
+          <Bot className="h-12 w-12 text-on-surface-variant/20 mb-4" />
+          <p className="text-base font-medium text-on-surface-variant">Ask anything about your safety.</p>
+          <p className="text-sm text-on-surface-variant/60 mt-1">Quick actions above to get started.</p>
         </div>
       )}
 
       {!loading && !error && result && (
         <div className="space-y-5">
-
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${riskStyle.bg} ${riskStyle.border}`}>
-            <Shield className={`h-6 w-6 ${riskStyle.text}`} />
+          <div className="flex items-center gap-4 p-5 rounded-xl bg-primary-500/10 border border-primary-500/20">
+            <Shield className="h-6 w-6 text-primary-400" />
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Risk Level</p>
-              <p className={`text-lg font-bold ${riskStyle.text}`}>{riskStyle.label}</p>
+              <p className="text-sm text-on-surface-variant uppercase tracking-wider">Risk Level</p>
+              <Badge variant={riskVariant} size="md" className="mt-1.5">{RISK_LABELS[riskKey] || 'Unknown'}</Badge>
             </div>
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <p className="text-sm text-gray-700 leading-relaxed">{result.summary}</p>
+          <div className="p-5 rounded-xl bg-stitch-surface border border-stitch-border">
+            <p className="text-base text-on-surface leading-relaxed">{result.summary}</p>
           </div>
 
           {result.recommendedDestination && (
-            <div className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
-              <div className="shrink-0 w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+            <div className="flex items-center gap-4 p-5 rounded-xl bg-primary-500/10 border border-primary-500/20">
+              <div className="shrink-0 w-12 h-12 rounded-full bg-primary-500/20 flex items-center justify-center text-primary-400">
                 {destIcon || <MapPin className="h-6 w-6" />}
               </div>
               <div>
-                <p className="text-xs text-blue-600 uppercase tracking-wider font-medium">{destLabel}</p>
-                <p className="text-sm font-semibold text-gray-900">{result.recommendedDestination.name}</p>
+                <p className="text-sm text-primary-400 uppercase tracking-wider font-medium">{destLabel}</p>
+                <p className="text-base font-semibold text-on-surface">{result.recommendedDestination.name}</p>
               </div>
             </div>
           )}
 
           {result.reason && (
-            <div className="p-4 bg-white rounded-xl border border-gray-200">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Reason</p>
-              <p className="text-sm text-gray-700 leading-relaxed">{result.reason}</p>
+            <div className="p-5 rounded-xl bg-stitch-surface border border-stitch-border">
+              <p className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider mb-2">Reason</p>
+              <p className="text-base text-on-surface leading-relaxed">{result.reason}</p>
             </div>
           )}
 
           {result.actions.length > 0 && (
-            <div className="p-4 bg-white rounded-xl border border-gray-200">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Recommended Actions</p>
-              <ul className="space-y-2">
+            <div className="p-5 rounded-xl bg-stitch-surface border border-stitch-border">
+              <p className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider mb-3">Recommended Actions</p>
+              <ul className="space-y-3">
                 {result.actions.map((action, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm text-gray-700">
-                    <span className="shrink-0 w-5 h-5 rounded-full bg-green-100 flex items-center justify-center mt-0.5">
-                      <Check className="h-3 w-3 text-green-600" />
+                  <li key={i} className="flex items-start gap-3 text-base text-on-surface">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-success-500/20 flex items-center justify-center mt-0.5">
+                      <Check className="h-4 w-4 text-success-400" />
                     </span>
                     {action}
                   </li>
@@ -207,19 +206,19 @@ export default function AIAssistant() {
             </div>
           )}
 
-          <div className="border border-gray-200 rounded-xl overflow-hidden">
+          <div className="border border-stitch-border rounded-xl overflow-hidden">
             <button
               onClick={() => setExplainOpen(!explainOpen)}
-              className="w-full flex items-center justify-between px-4 py-3 text-left text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+              className="w-full flex items-center justify-between px-5 py-3.5 text-left text-base font-medium text-on-surface bg-stitch-surface hover:bg-stitch-surface-hover transition-colors cursor-pointer"
             >
               <span>How this recommendation was generated</span>
-              {explainOpen ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+              {explainOpen ? <ChevronUp className="h-5 w-5 text-on-surface-variant" /> : <ChevronDown className="h-5 w-5 text-on-surface-variant" />}
             </button>
             {explainOpen && (
-              <div className="px-4 py-3 space-y-2 text-sm text-gray-600">
+              <div className="px-5 py-3.5 space-y-2 text-base text-on-surface-variant border-t border-stitch-border">
                 {[ 'Weather Agent', 'Alert Agent', 'Infrastructure Agent', 'Route Agent', 'Gemini Coordinator' ].map((agent) => (
                   <div key={agent} className="flex items-center gap-2">
-                    <Check className="h-3.5 w-3.5 text-green-500" />
+                    <Check className="h-4 w-4 text-success-500" />
                     {agent}
                   </div>
                 ))}
@@ -227,13 +226,13 @@ export default function AIAssistant() {
             )}
           </div>
 
-          <div className="pt-3 border-t border-gray-100">
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Powered by</p>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-              <span className="flex items-center gap-1"><Check className="h-3 w-3 text-green-400" /> OpenWeather</span>
-              <span className="flex items-center gap-1"><Check className="h-3 w-3 text-green-400" /> IMD / NDMA CAP Alerts</span>
-              <span className="flex items-center gap-1"><Check className="h-3 w-3 text-green-400" /> OpenStreetMap</span>
-              <span className="flex items-center gap-1"><Check className="h-3 w-3 text-green-400" /> Gemini</span>
+          <div className="pt-3 border-t border-stitch-border">
+            <p className="text-sm font-medium text-on-surface-variant uppercase tracking-wider mb-2">Powered by</p>
+            <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-on-surface-variant">
+              <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-success-500" /> OpenWeather</span>
+              <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-success-500" /> IMD / NDMA CAP Alerts</span>
+              <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-success-500" /> OpenStreetMap</span>
+              <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-success-500" /> Gemini</span>
             </div>
           </div>
         </div>

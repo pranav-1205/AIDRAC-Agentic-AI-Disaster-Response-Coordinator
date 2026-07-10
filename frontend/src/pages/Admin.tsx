@@ -1,6 +1,9 @@
-import { Building2, Stethoscope, AlertTriangle, Users, Shield } from 'lucide-react';
+import MaterialIcon from '../components/ui/MaterialIcon';
 import DashboardCard from '../components/DashboardCard';
-import LoadingSpinner from '../components/LoadingSpinner';
+import StatusBadge from '../components/ui/StatusBadge';
+import Card from '../components/ui/Card';
+import SectionHeader from '../components/ui/SectionHeader';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { useApi } from '../hooks/useApi';
 import { shelterApi, hospitalApi, disasterApi } from '../services/api';
 import { Shelter, Hospital, Disaster } from '../types';
@@ -20,73 +23,72 @@ export default function Admin() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Shield className="h-7 w-7 text-primary-500" />
+      <div className="flex items-center gap-4">
+        <div className="p-3 bg-primary-500/10 border border-primary-500/20 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.2)]">
+          <MaterialIcon icon="admin_panel_settings" className="text-3xl text-primary-400" />
+        </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
-          <p className="text-gray-500 mt-1">System overview and management</p>
+          <h1 className="text-3xl font-bold font-display text-white tracking-tight">Admin Console</h1>
+          <p className="text-sm font-mono text-slate-400 uppercase tracking-widest mt-1">System Overview & Management</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <DashboardCard
           title="Total Shelters"
           value={shelters?.length ?? 0}
-          icon={<Building2 className="h-6 w-6" />}
+          icon="emergency_home"
           subtitle={`${totalOccupancy}/${totalCapacity} occupied`}
           color="blue"
         />
         <DashboardCard
           title="Total Hospitals"
           value={hospitals?.length ?? 0}
-          icon={<Stethoscope className="h-6 w-6" />}
+          icon="local_hospital"
           subtitle={`${hospitals?.filter((h) => h.emergency_available).length ?? 0} emergency ready`}
           color="green"
         />
         <DashboardCard
           title="Active Disasters"
           value={activeDisasters}
-          icon={<AlertTriangle className="h-6 w-6" />}
+          icon="warning"
           subtitle={`${disasters?.length ?? 0} total incidents`}
           color="red"
         />
         <DashboardCard
           title="System Status"
           value="Operational"
-          icon={<Users className="h-6 w-6" />}
+          icon="dns"
           subtitle="All systems online"
           color="green"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Shelter Overview</h2>
+        <Card variant="glass" padding="md">
+          <SectionHeader title="Shelter Overview" />
           {shelters && shelters.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto mt-4">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 px-3 font-medium text-gray-500">Name</th>
-                    <th className="text-center py-2 px-3 font-medium text-gray-500">Occupancy</th>
-                    <th className="text-center py-2 px-3 font-medium text-gray-500">Capacity</th>
-                    <th className="text-center py-2 px-3 font-medium text-gray-500">%</th>
+                  <tr className="border-b border-slate-700/50 text-sm font-mono uppercase tracking-widest text-slate-400">
+                    <th className="text-left py-3 px-4">Name</th>
+                    <th className="text-center py-3 px-4">Occupancy</th>
+                    <th className="text-center py-3 px-4">Capacity</th>
+                    <th className="text-center py-3 px-4">%</th>
                   </tr>
                 </thead>
                 <tbody>
                   {shelters.map((s) => (
-                    <tr key={s.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-2 px-3 font-medium">{s.name}</td>
-                      <td className="py-2 px-3 text-center">{s.occupancy}</td>
-                      <td className="py-2 px-3 text-center">{s.capacity}</td>
-                      <td className="py-2 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          (s.occupancy / s.capacity) > 0.8 ? 'bg-red-100 text-red-700' :
-                          (s.occupancy / s.capacity) > 0.5 ? 'bg-orange-100 text-orange-700' :
-                          'bg-green-100 text-green-700'
-                        }`}>
-                          {Math.round((s.occupancy / s.capacity) * 100)}%
-                        </span>
+                    <tr key={s.id} className="border-b border-slate-800/50 hover:bg-white/5 transition-colors">
+                      <td className="py-3 px-4 font-medium text-slate-200">{s.name}</td>
+                      <td className="py-3 px-4 text-center text-slate-400 font-mono">{s.occupancy}</td>
+                      <td className="py-3 px-4 text-center text-slate-400 font-mono">{s.capacity}</td>
+                      <td className="py-3 px-4 text-center">
+                        <StatusBadge severity={
+                          (s.occupancy / s.capacity) > 0.8 ? 'critical' :
+                          (s.occupancy / s.capacity) > 0.5 ? 'severe' : 'low'
+                        } />
                       </td>
                     </tr>
                   ))}
@@ -94,33 +96,29 @@ export default function Admin() {
               </table>
             </div>
           ) : (
-            <p className="text-gray-400 text-sm">No shelters registered</p>
+            <p className="text-slate-500 text-sm mt-4 font-mono">No shelters registered</p>
           )}
-        </div>
+        </Card>
 
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Active Disaster Zones</h2>
+        <Card variant="glass" padding="md">
+          <SectionHeader title="Active Disaster Zones" />
           {disasters && disasters.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto mt-4">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 px-3 font-medium text-gray-500">Type</th>
-                    <th className="text-left py-2 px-3 font-medium text-gray-500">Severity</th>
-                    <th className="text-center py-2 px-3 font-medium text-gray-500">Status</th>
+                  <tr className="border-b border-slate-700/50 text-sm font-mono uppercase tracking-widest text-slate-400">
+                    <th className="text-left py-3 px-4">Type</th>
+                    <th className="text-left py-3 px-4">Severity</th>
+                    <th className="text-center py-3 px-4">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {disasters.map((d) => (
-                    <tr key={d.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-2 px-3 font-medium">{d.type}</td>
-                      <td className="py-2 px-3 capitalize">{d.severity}</td>
-                      <td className="py-2 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          d.status === 'active' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-                        }`}>
-                          {d.status}
-                        </span>
+                    <tr key={d.id} className="border-b border-slate-800/50 hover:bg-white/5 transition-colors">
+                      <td className="py-3 px-4 font-medium text-slate-200">{d.type}</td>
+                      <td className="py-3 px-4 capitalize text-slate-400">{d.severity}</td>
+                      <td className="py-3 px-4 text-center">
+                        <StatusBadge severity={d.status} />
                       </td>
                     </tr>
                   ))}
@@ -128,9 +126,9 @@ export default function Admin() {
               </table>
             </div>
           ) : (
-            <p className="text-gray-400 text-sm">No disaster zones</p>
+            <p className="text-slate-500 text-sm mt-4 font-mono">No disaster zones</p>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );

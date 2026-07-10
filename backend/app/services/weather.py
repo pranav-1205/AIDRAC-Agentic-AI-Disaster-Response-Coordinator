@@ -8,17 +8,7 @@ class WeatherService:
 
     async def get_current_weather(self, lat: float, lng: float) -> dict:
         if not settings.OPENWEATHER_API_KEY:
-            return {
-                "temperature": 32,
-                "feels_like": 35,
-                "humidity": 75,
-                "description": "Partly cloudy",
-                "wind_speed": 12,
-                "rain": 0,
-                "icon": "04d",
-                "city": "Sample City",
-                "is_mock": True,
-            }
+            raise ValueError("OpenWeather API key not configured")
 
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -44,5 +34,4 @@ class WeatherService:
                 "rain": rain,
                 "icon": data["weather"][0]["icon"],
                 "city": data["name"],
-                "is_mock": False,
             }

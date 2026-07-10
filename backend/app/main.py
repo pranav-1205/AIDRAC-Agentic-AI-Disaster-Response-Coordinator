@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config.settings import settings
 from app.database.connection import engine, Base, async_session_factory
-from app.database.seed import seed_database
 from app.routers import auth, users, shelters, hospitals, disasters, alerts, routes, weather, location, ai
 from app.services.disaster_sources.background_refresh import BackgroundIngestion
 
@@ -14,8 +13,6 @@ _background_ingestion = BackgroundIngestion(async_session_factory)
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-    await seed_database(async_session_factory())
 
     await _background_ingestion.start()
 

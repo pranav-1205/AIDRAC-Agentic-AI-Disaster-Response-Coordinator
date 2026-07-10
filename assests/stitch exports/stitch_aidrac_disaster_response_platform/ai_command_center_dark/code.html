@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIDRAC - AI Assistant</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config from Style Guidance -->
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "error": "#ba1a1a",
+                      "secondary-fixed": "#ffdbca",
+                      "secondary": "#9d4300",
+                      "surface-container": "#ededf9",
+                      "surface-container-low": "#f3f3fe",
+                      "on-error": "#ffffff",
+                      "surface-tint": "#0053db",
+                      "inverse-surface": "#2e3039",
+                      "surface-container-highest": "#e1e2ed",
+                      "on-primary-fixed-variant": "#003ea8",
+                      "on-primary-fixed": "#00174b",
+                      "on-tertiary-container": "#ffede6",
+                      "inverse-on-surface": "#f0f0fb",
+                      "primary": "#004ac6",
+                      "error-container": "#ffdad6",
+                      "on-secondary-container": "#5c2400",
+                      "tertiary-fixed-dim": "#ffb596",
+                      "outline-variant": "#c3c6d7",
+                      "on-surface-variant": "#434655",
+                      "primary-fixed-dim": "#b4c5ff",
+                      "primary-fixed": "#dbe1ff",
+                      "on-tertiary": "#ffffff",
+                      "surface-variant": "#e1e2ed",
+                      "surface-dim": "#d9d9e5",
+                      "surface-container-lowest": "#ffffff",
+                      "on-surface": "#191b23",
+                      "on-primary": "#ffffff",
+                      "inverse-primary": "#b4c5ff",
+                      "primary-container": "#2563eb",
+                      "surface-container-high": "#e7e7f3",
+                      "tertiary": "#943700",
+                      "surface-bright": "#faf8ff",
+                      "on-secondary-fixed-variant": "#783200",
+                      "on-error-container": "#93000a",
+                      "on-secondary-fixed": "#341100",
+                      "on-background": "#191b23",
+                      "on-tertiary-fixed": "#360f00",
+                      "tertiary-container": "#bc4800",
+                      "on-secondary": "#ffffff",
+                      "outline": "#737686",
+                      "secondary-container": "#fd761a",
+                      "on-tertiary-fixed-variant": "#7d2d00",
+                      "secondary-fixed-dim": "#ffb690",
+                      "tertiary-fixed": "#ffdbcd",
+                      "surface": "#faf8ff",
+                      "on-primary-container": "#eeefff",
+                      "background": "#faf8ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "container-padding": "32px",
+                      "unit": "4px",
+                      "stack-sm": "8px",
+                      "card-padding": "20px",
+                      "gutter": "24px",
+                      "stack-md": "16px",
+                      "stack-lg": "24px"
+              },
+              "fontFamily": {
+                      "mono-label": [
+                              "JetBrains Mono"
+                      ],
+                      "label-md": [
+                              "Geist"
+                      ],
+                      "headline-lg-mobile": [
+                              "Geist"
+                      ],
+                      "headline-lg": [
+                              "Geist"
+                      ],
+                      "display-lg": [
+                              "Geist"
+                      ],
+                      "body-md": [
+                              "Geist"
+                      ],
+                      "headline-md": [
+                              "Geist"
+                      ],
+                      "body-lg": [
+                              "Geist"
+                      ]
+              },
+              "fontSize": {
+                      "mono-label": [
+                              "11px",
+                              {
+                                      "lineHeight": "14px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.04em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      }
+          }
+        }
+    </script>
+<style>
+        /* Custom Keyframes for subtle entrance animations */
+        @keyframes slideUpFade {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .animate-in {
+            animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .delay-100 { animation-delay: 100ms; opacity: 0; }
+        .delay-200 { animation-delay: 200ms; opacity: 0; }
+        .delay-300 { animation-delay: 300ms; opacity: 0; }
+        
+        /* Agent Indicator Pulse */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+        .agent-pulse::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background-color: var(--tw-colors-primary);
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body class="bg-background dark:bg-neutral-950 text-on-background dark:text-neutral-100 font-body-md text-body-md h-screen w-full flex overflow-hidden antialiased">
+<!-- JSON: SideNavBar (Global App Nav) -->
+<nav class="bg-surface-container-low dark:bg-neutral-900 text-primary dark:text-primary-fixed-dim font-label-md text-label-md fixed left-0 top-0 h-full w-[280px] hidden lg:flex flex-col border-r border-outline-variant/20 dark:border-neutral-800 flex flex-col h-full p-stack-lg gap-stack-sm z-20 transition-all duration-200 ease-in-out">
+<div class="flex items-center gap-stack-md mb-stack-lg px-2">
+<div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">crisis_alert</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-black text-primary dark:text-primary-fixed">AIDRAC</h1>
+<p class="font-label-md text-label-md text-on-surface-variant dark:text-neutral-400">Crisis Response</p>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto space-y-unit">
+<!-- Tabs (Iterated from JSON, AI Assistant is Active) -->
+<a class="flex items-center gap-stack-md px-3 py-2 rounded-lg text-on-surface-variant dark:text-neutral-300 hover:text-on-surface dark:hover:text-neutral-100 hover:bg-surface-container-high dark:hover:bg-neutral-800 transition-all" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-stack-md px-3 py-2 rounded-lg text-on-surface-variant dark:text-neutral-300 hover:text-on-surface dark:hover:text-neutral-100 hover:bg-surface-container-high dark:hover:bg-neutral-800 transition-all" href="#">
+<span class="material-symbols-outlined">map</span>
+<span>Live Map</span>
+</a>
+<a class="flex items-center gap-stack-md px-3 py-2 rounded-lg text-on-surface-variant dark:text-neutral-300 hover:text-on-surface dark:hover:text-neutral-100 hover:bg-surface-container-high dark:hover:bg-neutral-800 transition-all" href="#">
+<span class="material-symbols-outlined">home_pin</span>
+<span>Shelters</span>
+</a>
+<a class="flex items-center gap-stack-md px-3 py-2 rounded-lg text-on-surface-variant dark:text-neutral-300 hover:text-on-surface dark:hover:text-neutral-100 hover:bg-surface-container-high dark:hover:bg-neutral-800 transition-all" href="#">
+<span class="material-symbols-outlined">local_hospital</span>
+<span>Hospitals</span>
+</a>
+<a class="flex items-center gap-stack-md px-3 py-2 rounded-lg text-on-surface-variant dark:text-neutral-300 hover:text-on-surface dark:hover:text-neutral-100 hover:bg-surface-container-high dark:hover:bg-neutral-800 transition-all" href="#">
+<span class="material-symbols-outlined">sensors</span>
+<span>Monitoring</span>
+</a>
+<a class="flex items-center gap-stack-md px-3 py-2 rounded-lg text-on-surface-variant dark:text-neutral-300 hover:text-on-surface dark:hover:text-neutral-100 hover:bg-surface-container-high dark:hover:bg-neutral-800 transition-all" href="#">
+<span class="material-symbols-outlined">emergency</span>
+<span>Alerts</span>
+</a>
+<!-- Active Tab -->
+<a class="flex items-center gap-stack-md px-3 py-2 bg-primary-container dark:bg-primary text-on-primary-container dark:text-on-primary font-semibold rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+<span>AI Assistant</span>
+</a>
+<a class="flex items-center gap-stack-md px-3 py-2 rounded-lg text-on-surface-variant dark:text-neutral-300 hover:text-on-surface dark:hover:text-neutral-100 hover:bg-surface-container-high dark:hover:bg-neutral-800 transition-all" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span>Analytics</span>
+</a>
+<a class="flex items-center gap-stack-md px-3 py-2 rounded-lg text-on-surface-variant dark:text-neutral-300 hover:text-on-surface dark:hover:text-neutral-100 hover:bg-surface-container-high dark:hover:bg-neutral-800 transition-all" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Settings</span>
+</a>
+</div>
+<div class="mt-auto space-y-unit pt-stack-md border-t border-outline-variant/20 dark:border-neutral-800">
+<a class="flex items-center gap-stack-md px-3 py-2 rounded-lg text-on-surface-variant dark:text-neutral-300 hover:text-on-surface dark:hover:text-neutral-100 hover:bg-surface-container-high dark:hover:bg-neutral-800 transition-all" href="#">
+<span class="material-symbols-outlined">help</span>
+<span>Help Center</span>
+</a>
+<a class="flex items-center gap-stack-md px-3 py-2 rounded-lg text-on-surface-variant dark:text-neutral-300 hover:text-on-surface dark:hover:text-neutral-100 hover:bg-surface-container-high dark:hover:bg-neutral-800 transition-all" href="#">
+<span class="material-symbols-outlined">contact_support</span>
+<span>Support</span>
+</a>
+<button class="w-full mt-stack-md flex items-center justify-center gap-2 py-2 px-4 bg-error text-on-error rounded-lg font-label-md text-label-md hover:bg-error/90 transition-colors">
+<span class="material-symbols-outlined">warning</span>
+                Emergency SOS
+            </button>
+</div>
+</nav>
+<!-- Main Content Area Wrapper (Offset by Global Nav width on large screens) -->
+<div class="flex-1 flex lg:ml-[280px] h-full overflow-hidden bg-surface-container-lowest dark:bg-neutral-950">
+<!-- Secondary Sidebar: Chat History -->
+<aside class="w-64 border-r border-outline-variant/20 dark:border-neutral-800 bg-surface-bright dark:bg-neutral-900 hidden md:flex flex-col h-full shrink-0">
+<div class="p-4 border-b border-outline-variant/20 dark:border-neutral-800 flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md text-on-surface dark:text-neutral-100">Conversations</h2>
+<button class="p-1.5 rounded-md hover:bg-surface-container dark:hover:bg-neutral-800 transition-colors text-primary dark:text-primary-fixed">
+<span class="material-symbols-outlined">edit_square</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-2 space-y-1">
+<!-- Pinned/Active Section -->
+<div class="px-2 py-2 text-on-surface-variant dark:text-neutral-400 font-mono-label text-mono-label uppercase tracking-wider">Active Incident</div>
+<button class="w-full text-left p-3 rounded-lg bg-surface-container-high dark:bg-neutral-800 text-on-surface dark:text-neutral-100 flex flex-col gap-1 mb-2">
+<span class="font-body-md text-body-md font-medium truncate">Flood Assessment - Sector 4</span>
+<span class="font-label-md text-label-md text-on-surface-variant dark:text-neutral-400">Just now</span>
+</button>
+<!-- Previous Section -->
+<div class="px-2 py-2 mt-4 text-on-surface-variant dark:text-neutral-400 font-mono-label text-mono-label uppercase tracking-wider">Last 7 Days</div>
+<button class="w-full text-left p-3 rounded-lg hover:bg-surface-container dark:hover:bg-neutral-800 text-on-surface-variant dark:text-neutral-300 hover:text-on-surface dark:hover:text-neutral-100 transition-colors flex flex-col gap-1">
+<span class="font-body-md text-body-md truncate">Power Outage Report</span>
+<span class="font-label-md text-label-md">Yesterday</span>
+</button>
+<button class="w-full text-left p-3 rounded-lg hover:bg-surface-container dark:hover:bg-neutral-800 text-on-surface-variant dark:text-neutral-300 hover:text-on-surface dark:hover:text-neutral-100 transition-colors flex flex-col gap-1">
+<span class="font-body-md text-body-md truncate">Supply Route Verification</span>
+<span class="font-label-md text-label-md">Oct 24</span>
+</button>
+</div>
+</aside>
+<!-- Main Chat Canvas -->
+<main class="flex-1 flex flex-col relative h-full bg-surface-container-lowest dark:bg-neutral-950">
+<!-- Mobile Header (Visible only when Global/Secondary navs might be hidden) -->
+<header class="md:hidden flex items-center justify-between p-4 border-b border-outline-variant/20 dark:border-neutral-800 bg-surface-container-lowest dark:bg-neutral-900">
+<div class="flex items-center gap-2 text-primary dark:text-primary-fixed font-headline-md text-headline-md">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+<span>AIDRAC</span>
+</div>
+<button class="text-on-surface-variant dark:text-neutral-300">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</header>
+<!-- Chat Scroll Area -->
+<div class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
+<div class="max-w-3xl mx-auto space-y-8 pb-32">
+<!-- Intro / Context Header -->
+<div class="text-center space-y-2 mb-12 animate-in">
+<div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-container/10 dark:bg-primary/20 text-primary dark:text-primary-fixed mb-2 relative">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface dark:text-neutral-100">Emergency Response Assistant</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant dark:text-neutral-400">Real-time intelligence and structured actionable guidance.</p>
+</div>
+<!-- User Message -->
+<div class="flex justify-end w-full animate-in delay-100">
+<div class="max-w-[80%] md:max-w-[70%]">
+<div class="bg-surface-container dark:bg-neutral-800 text-on-surface dark:text-neutral-100 px-5 py-3 rounded-2xl rounded-tr-sm shadow-sm inline-block">
+<p class="font-body-md text-body-md">There is flooding near me.</p>
+</div>
+<div class="flex justify-end mt-1 px-1">
+<span class="font-label-md text-label-md text-on-surface-variant dark:text-neutral-400">10:42 AM</span>
+</div>
+</div>
+</div>
+<!-- AI Response Block -->
+<div class="flex flex-col gap-3 w-full animate-in delay-200">
+<div class="flex items-end gap-3">
+<!-- AI Avatar -->
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary shrink-0 shadow-sm relative agent-pulse">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<!-- AI Text Intro -->
+<div class="text-on-surface dark:text-neutral-200 font-body-md text-body-md pt-1">
+<p>I have analyzed your current geospatial coordinates. <span class="font-medium text-neutral-100">Severe flooding has been detected in your immediate vicinity.</span> Please review the structured assessment below and proceed to safety immediately.</p>
+</div>
+</div>
+<!-- Structured Data Container (Bento Grid) -->
+<div class="ml-11 mt-2">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- Metric Card 1: Risk (Critical) -->
+<div class="bg-error-container dark:bg-red-950/40 border border-error/20 dark:border-red-900 rounded-xl p-4 shadow-sm flex flex-col gap-2">
+<div class="flex items-center gap-2 text-on-error-container dark:text-red-300">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">warning</span>
+<span class="font-label-md text-label-md uppercase tracking-wider">Current Risk</span>
+</div>
+<div class="font-headline-lg text-headline-lg text-on-error-container dark:text-red-200 font-bold">
+                                        HIGH
+                                    </div>
+<div class="font-mono-label text-mono-label text-on-error-container/80 dark:text-red-300/80 mt-auto pt-2 border-t border-error/10 dark:border-red-900/50">
+                                        WATER LEVEL: +1.2M / HR
+                                    </div>
+</div>
+<!-- Metric Card 2: Shelter -->
+<div class="bg-surface dark:bg-neutral-900 border border-outline-variant/30 dark:border-neutral-800 rounded-xl p-4 shadow-sm flex flex-col gap-2">
+<div class="flex items-center gap-2 text-on-surface-variant dark:text-neutral-400">
+<span class="material-symbols-outlined text-lg">home_pin</span>
+<span class="font-label-md text-label-md uppercase tracking-wider">Nearest Shelter</span>
+</div>
+<div class="font-headline-md text-headline-md text-on-surface dark:text-neutral-100">
+                                        Community Hall A
+                                    </div>
+<div class="font-mono-label text-mono-label text-on-surface-variant dark:text-neutral-400 mt-auto pt-2 border-t border-outline-variant/20 dark:border-neutral-800 flex justify-between">
+<span>CAPACITY: 45%</span>
+<span class="text-primary dark:text-primary-fixed">1.2 KM</span>
+</div>
+</div>
+<!-- Metric Card 3: Route -->
+<div class="bg-surface dark:bg-neutral-900 border border-outline-variant/30 dark:border-neutral-800 rounded-xl p-4 shadow-sm flex flex-col gap-2">
+<div class="flex items-center gap-2 text-on-surface-variant dark:text-neutral-400">
+<span class="material-symbols-outlined text-lg">route</span>
+<span class="font-label-md text-label-md uppercase tracking-wider">Safe Route</span>
+</div>
+<div class="font-headline-md text-headline-md text-emerald-600 dark:text-emerald-400">
+                                        Available
+                                    </div>
+<div class="font-mono-label text-mono-label text-on-surface-variant dark:text-neutral-400 mt-auto pt-2 border-t border-outline-variant/20 dark:border-neutral-800">
+                                        VIA MAIN ST. (ELEVATED)
+                                    </div>
+</div>
+</div>
+<!-- Action Buttons Cluster -->
+<div class="mt-4 flex flex-wrap items-center gap-3">
+<button class="flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary rounded-lg font-label-md text-label-md shadow-sm hover:bg-primary/90 transition-all active:scale-95">
+<span class="material-symbols-outlined text-[18px]">navigation</span>
+                                    Navigate to Shelter
+                                </button>
+<button class="flex items-center gap-2 px-5 py-2.5 bg-error dark:bg-red-700 text-on-error rounded-lg font-label-md text-label-md shadow-sm hover:bg-error/90 dark:hover:bg-red-600 transition-all active:scale-95">
+<span class="material-symbols-outlined text-[18px]">call</span>
+                                    Call Emergency
+                                </button>
+<button class="flex items-center gap-2 px-5 py-2.5 bg-surface dark:bg-neutral-900 border border-outline-variant/50 dark:border-neutral-700 text-on-surface dark:text-neutral-200 rounded-lg font-label-md text-label-md hover:bg-surface-container dark:hover:bg-neutral-800 transition-all active:scale-95">
+<span class="material-symbols-outlined text-[18px]">share_location</span>
+                                    Share Location
+                                </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Input Area (Fixed Bottom, Glassmorphism) -->
+<div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-surface-container-lowest dark:from-neutral-950 via-surface-container-lowest dark:via-neutral-950 to-transparent pb-6 pt-10 px-4">
+<div class="max-w-3xl mx-auto relative group">
+<div class="absolute -inset-0.5 bg-gradient-to-r from-primary-fixed to-inverse-primary rounded-2xl blur opacity-20 dark:opacity-30 group-focus-within:opacity-40 transition duration-500"></div>
+<div class="relative flex items-end gap-2 bg-surface/80 dark:bg-neutral-900/80 backdrop-blur-xl border border-outline-variant/30 dark:border-neutral-700 rounded-2xl p-2 shadow-sm focus-within:border-primary dark:focus-within:border-primary-fixed focus-within:ring-1 focus-within:ring-primary dark:focus-within:ring-primary-fixed transition-all">
+<button class="p-2 text-on-surface-variant dark:text-neutral-400 hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-neutral-800 rounded-xl transition-colors shrink-0">
+<span class="material-symbols-outlined">add_circle</span>
+</button>
+<textarea class="flex-1 max-h-32 bg-transparent border-0 focus:ring-0 resize-none py-2.5 px-2 text-on-surface dark:text-neutral-100 font-body-md text-body-md placeholder:text-on-surface-variant/50 dark:placeholder:text-neutral-500" placeholder="Message AIDRAC or describe your emergency..." rows="1"></textarea>
+<button class="p-2.5 bg-primary text-on-primary hover:bg-primary/90 rounded-xl transition-all active:scale-95 shrink-0 flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+<div class="text-center mt-2">
+<span class="font-mono-label text-mono-label text-on-surface-variant/60 dark:text-neutral-500">AIDRAC Agentic System v2.1 • Critical accuracy guaranteed.</span>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

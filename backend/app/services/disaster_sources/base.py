@@ -15,7 +15,6 @@ class WeatherData:
     lng: float
     description: str = ""
     icon: str = ""
-    is_mock: bool = False
 
 
 @dataclass

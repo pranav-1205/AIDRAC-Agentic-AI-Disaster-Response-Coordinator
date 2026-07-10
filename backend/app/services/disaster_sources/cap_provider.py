@@ -8,21 +8,44 @@ from app.services.disaster_sources.base import AlertProvider, AlertData
 from app.services.disaster_sources.cache import CacheService
 
 logger = logging.getLogger("aidrac.disaster_sources.cap_provider")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _sh = logging.StreamHandler()
+    _sh.setLevel(logging.INFO)
+    _sh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%H:%M:%S"))
+    logger.addHandler(_sh)
+    logger.propagate = False
 
 CAP_NS = "urn:oasis:names:tc:emergency:cap:1.2"
-MAX_ALERTS_PER_FEED = 10
+
+MAX_XML_PER_FEED = 3
+CONCURRENT_XML_LIMIT = 2
+DELAY_BETWEEN_XML = 1.0
+MAX_RETRIES = 1
+RETRY_BACKOFF = 30.0
+INITIAL_DELAY = 2.0
+BATCH_RETRY_DELAY = 0
 
 
 class CapProvider(AlertProvider):
     def __init__(self) -> None:
         self._cache = CacheService()
         self._sources: list[tuple[str, str]] = []
+        self._xml_semaphore = asyncio.Semaphore(CONCURRENT_XML_LIMIT)
 
         if settings.IMD_CAP_RSS_URL:
             self._sources.append((settings.IMD_CAP_RSS_URL, "imd"))
+            logger.info("IMD source added: %s", settings.IMD_CAP_RSS_URL)
+        else:
+            logger.warning("IMD source NOT added — URL is empty/falsy")
 
         if settings.NDMA_CAP_RSS_URL:
             self._sources.append((settings.NDMA_CAP_RSS_URL, "ndma"))
+            logger.info("NDMA source added: %s", settings.NDMA_CAP_RSS_URL)
+        else:
+            logger.warning("NDMA source NOT added — URL is empty/falsy")
+
+        logger.info("CapProvider initialized with %d sources", len(self._sources))
 
     async def clear_cache(self) -> None:
         self._cache.clear()
@@ -48,15 +71,11 @@ class CapProvider(AlertProvider):
                         seen.add(alert.external_id)
                         merged.append(alert)
 
-        logger.info("Merged %d unique alerts from %d sources", len(merged), len(self._sources))
+        logger.info("[CAP] Merged %d unique alerts from %d sources", len(merged), len(self._sources))
 
         if merged:
             self._cache.set("merged_alerts", merged, ttl=settings.CACHE_TTL_SECONDS)
-        else:
-            stale = self._cache.get("merged_alerts")
-            if stale is not None:
-                logger.info("All feeds failed — serving %d stale cached alerts", len(stale))
-                return stale
+            logger.info("[CAP] Cached %d alerts for %d seconds", len(merged), settings.CACHE_TTL_SECONDS)
 
         return merged
 
@@ -84,30 +103,57 @@ class CapProvider(AlertProvider):
                 logger.debug("RSS cache miss — fetched %d bytes from %s", len(rss_text), url)
 
         items = self._parse_rss_items(rss_text)
-        logger.info("RSS Items for %s: %d", label, len(items))
+        logger.info("[CAP] %s RSS items: %d", label, len(items))
 
         if not items:
             return []
 
-        recent = items[:MAX_ALERTS_PER_FEED]
-
         cap_urls = []
-        for i, item in enumerate(recent):
+        for i, item in enumerate(items):
             cap_url = self._extract_cap_url(item)
             if cap_url:
                 cap_urls.append(cap_url)
             else:
-                logger.warning("RSS item %d in %s has no CAP XML URL (keys: %s)", i, label, list(item.keys()))
+                logger.warning("[CAP] %s item %d has no CAP XML URL (keys: %s)", label, i, list(item.keys()))
 
-        logger.info("Downloading CAP XML for %s: %d files", label, len(cap_urls))
+        logger.info("[CAP] %s CAP XML URLs extracted: %d / %d items", label, len(cap_urls), len(items))
+
+        limited_urls = cap_urls[:MAX_XML_PER_FEED]
+        if len(cap_urls) > MAX_XML_PER_FEED:
+            logger.info("[CAP] %s limiting to first %d CAP XML URLs (total available: %d)", label, MAX_XML_PER_FEED, len(cap_urls))
 
         alerts: list[AlertData] = []
-        for url in cap_urls:
-            alert = await self._fetch_cap_xml(url, label)
-            if alert is not None:
-                alerts.append(alert)
+        max_batch_retries = 1 if BATCH_RETRY_DELAY > 0 else 0
+        urls_to_fetch = list(limited_urls)
+        batch_attempt = 0
 
-        logger.info("Parsed %d CAP alerts from %s", len(alerts), label)
+        while urls_to_fetch and batch_attempt <= max_batch_retries:
+            if batch_attempt > 0:
+                logger.info("[CAP] %s batch retry %d/%d for %d URLs after %.1fs cooldown", label, batch_attempt, max_batch_retries, len(urls_to_fetch), BATCH_RETRY_DELAY)
+                await asyncio.sleep(BATCH_RETRY_DELAY)
+            else:
+                logger.info("[CAP] %s initial delay of %.1fs before CAP XML fetches", label, INITIAL_DELAY)
+                await asyncio.sleep(INITIAL_DELAY)
+
+            rate_limited_urls: list[str] = []
+            for idx, xml_url in enumerate(urls_to_fetch):
+                if idx > 0:
+                    await asyncio.sleep(DELAY_BETWEEN_XML)
+                alert, was_limited = await self._fetch_cap_xml(xml_url, label)
+                if alert is not None:
+                    alerts.append(alert)
+                elif was_limited:
+                    rate_limited_urls.append(xml_url)
+
+            if rate_limited_urls and batch_attempt < max_batch_retries:
+                urls_to_fetch = [u for u in rate_limited_urls if self._cache.get(f"cap:{u}") is None]
+                if urls_to_fetch:
+                    batch_attempt += 1
+                    logger.info("[CAP] %s %d URLs rate-limited, will retry batch after cooldown", label, len(urls_to_fetch))
+                    continue
+            break
+
+        logger.info("[CAP] %s parsed: %d alerts from %d CAP XML files", label, len(alerts), len(limited_urls))
         return alerts
 
     @staticmethod
@@ -139,24 +185,55 @@ class CapProvider(AlertProvider):
             items.append(item)
         return items
 
-    async def _fetch_cap_xml(self, url: str, label: str) -> AlertData | None:
+    async def _fetch_cap_xml(self, url: str, label: str) -> tuple[AlertData | None, bool]:
         cache_key = f"cap:{url}"
         cached = self._cache.get(cache_key)
         if cached is not None:
             logger.debug("CAP XML cache hit for %s", url)
-            return cached
+            return cached, False
 
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                alert = self._parse_single_alert(resp.content, label)
-                if alert is not None:
-                    self._cache.set(cache_key, alert, ttl=settings.CACHE_TTL_SECONDS)
-                return alert
-        except Exception as exc:
-            logger.warning("Failed to fetch/parse CAP XML %s for %s: %s", url, label, exc)
-            return None
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+        }
+
+        async with self._xml_semaphore:
+            for attempt in range(1, MAX_RETRIES + 1):
+                try:
+                    if attempt > 1:
+                        delay = RETRY_BACKOFF * (2 ** (attempt - 2))
+                        logger.info("CAP XML retry %d/%d for %s after %.1fs", attempt, MAX_RETRIES, url, delay)
+                        await asyncio.sleep(delay)
+                    async with httpx.AsyncClient(timeout=30.0, follow_redirects=False, headers=headers) as client:
+                        resp = await client.get(url)
+                        if resp.status_code == 302:
+                            location = resp.headers.get("location", "")
+                            if attempt < MAX_RETRIES:
+                                logger.warning("CAP XML %s for %s returned 302 to %s — rate limited, retrying (%d/%d)", url, label, location, attempt, MAX_RETRIES)
+                                continue
+                            else:
+                                logger.warning("CAP XML %s for %s returned 302 to %s — rate limited, giving up after %d retries", url, label, location, MAX_RETRIES)
+                                return None, True
+                        resp.raise_for_status()
+                        alert = self._parse_single_alert(resp.content, label)
+                        if alert is not None:
+                            self._cache.set(cache_key, alert, ttl=settings.CACHE_TTL_SECONDS)
+                        return alert, False
+                except httpx.HTTPStatusError as exc:
+                    if exc.response.status_code == 302:
+                        if attempt < MAX_RETRIES:
+                            logger.warning("CAP XML %s for %s returned 302 — retrying (%d/%d)", url, label, attempt, MAX_RETRIES)
+                            continue
+                        else:
+                            logger.warning("CAP XML %s for %s returned 302 — giving up after %d retries", url, label, MAX_RETRIES)
+                            return None, True
+                    logger.warning("Failed to fetch/parse CAP XML %s for %s (attempt %d/%d): %s", url, label, attempt, MAX_RETRIES, exc)
+                    return None, False
+                except Exception as exc:
+                    logger.warning("Failed to fetch/parse CAP XML %s for %s (attempt %d/%d): %s", url, label, attempt, MAX_RETRIES, exc)
+                    return None, False
+            return None, True
 
     @staticmethod
     def _parse_single_alert(raw_xml: bytes, label: str = "unknown") -> AlertData | None:

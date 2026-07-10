@@ -1,3 +1,5 @@
+import math
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,81 +7,57 @@ from sqlalchemy import select, or_
 from app.models.alert import Alert
 from app.schemas.alert import AlertCreate
 
-INDIAN_STATES: dict[str, set[str]] = {
-    "andhra pradesh": {"andhra pradesh", "andhra"},
-    "arunachal pradesh": {"arunachal pradesh", "arunachal"},
-    "assam": {"assam"},
-    "bihar": {"bihar"},
-    "chhattisgarh": {"chhattisgarh"},
-    "goa": {"goa"},
-    "gujarat": {"gujarat"},
-    "haryana": {"haryana"},
-    "himachal pradesh": {"himachal pradesh", "himachal"},
-    "jharkhand": {"jharkhand"},
-    "karnataka": {"karnataka"},
-    "kerala": {"kerala"},
-    "madhya pradesh": {"madhya pradesh", "madhya"},
-    "maharashtra": {"maharashtra"},
-    "manipur": {"manipur"},
-    "meghalaya": {"meghalaya"},
-    "mizoram": {"mizoram"},
-    "nagaland": {"nagaland"},
-    "odisha": {"odisha", "orissa"},
-    "punjab": {"punjab"},
-    "rajasthan": {"rajasthan"},
-    "sikkim": {"sikkim"},
-    "tamil nadu": {"tamil nadu", "tamilnadu"},
-    "telangana": {"telangana"},
-    "tripura": {"tripura"},
-    "uttar pradesh": {"uttar pradesh", "uttar"},
-    "uttarakhand": {"uttarakhand", "uk"},
-    "west bengal": {"west bengal", "bengal"},
-    "andaman": {"andaman", "andaman and nicobar"},
-    "chandigarh": {"chandigarh"},
-    "dadra": {"dadra", "dadra and nagar haveli"},
-    "daman": {"daman", "daman and diu"},
-    "delhi": {"delhi", "new delhi", "nct"},
-    "ladakh": {"ladakh"},
-    "lakshadweep": {"lakshadweep"},
-    "puducherry": {"puducherry", "pondicherry"},
-    "jammu": {"jammu", "jammu and kashmir", "kashmir"},
-}
+logger = logging.getLogger("aidrac.services.alert")
+
+EARTH_RADIUS_KM = 6371
+SEARCH_RADIUS_KM = 200
 
 
-def _normalize(text: str) -> str:
-    return text.lower().replace("-", " ").replace(",", " ").strip()
+def _haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
+    )
+    return 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)) * EARTH_RADIUS_KM
 
 
-def _get_user_state(lat: float, lng: float) -> str | None:
-    for state_name, aliases in INDIAN_STATES.items():
-        for alias in aliases:
-            for pattern in [alias]:
-                if _normalize(alias) == alias.lower():
-                    pass
-    return None
+def _point_in_polygon(lat: float, lng: float, polygon: list[tuple[float, float]]) -> bool:
+    inside = False
+    n = len(polygon)
+    j = n - 1
+    for i in range(n):
+        yi, xi = polygon[i]
+        yj, xj = polygon[j]
+        if ((xi > lng) != (xj > lng)) and (lat < (yj - yi) * (lng - xi) / (xj - xi) + yi):
+            inside = not inside
+        j = i
+    return inside
 
 
-def _alert_matches_area(alert_area: str, user_state: str) -> bool:
-    if not alert_area or not user_state:
-        return False
-    normalized_alert = _normalize(alert_area)
-    normalized_user = _normalize(user_state)
-    if normalized_user in normalized_alert:
-        return True
-    for state_name, aliases in INDIAN_STATES.items():
-        if normalized_user == _normalize(state_name):
-            for alias in aliases:
-                if _normalize(alias) in normalized_alert:
-                    return True
-            break
-    return False
+def _parse_polygon(text: str) -> list[tuple[float, float]]:
+    parts = text.strip().replace(",", " ").split()
+    coords: list[tuple[float, float]] = []
+    for i in range(0, len(parts), 2):
+        lat = float(parts[i])
+        lng = float(parts[i + 1])
+        coords.append((lat, lng))
+    return coords
 
 
-def _is_nationwide_alert(area: str) -> bool:
+def _polygon_centroid(polygon: list[tuple[float, float]]) -> tuple[float, float]:
+    lat_sum = sum(p[0] for p in polygon)
+    lng_sum = sum(p[1] for p in polygon)
+    n = len(polygon)
+    return (lat_sum / n, lng_sum / n)
+
+
+def _is_nationwide(area: str) -> bool:
     if not area:
-        return True
-    nationwide_keywords = {"all india", "entire india", "whole india", "nationwide", "all over india"}
-    return _normalize(area) in nationwide_keywords
+        return False
+    kw = {"all india", "entire india", "whole india", "nationwide", "all over india"}
+    return area.lower().strip() in kw
 
 
 class AlertService:
@@ -90,6 +68,7 @@ class AlertService:
         self,
         lat: float | None = None,
         lng: float | None = None,
+        all_alerts: bool = False,
     ) -> list[Alert]:
         now = datetime.now(timezone.utc)
         result = await self.db.execute(
@@ -105,9 +84,8 @@ class AlertService:
         )
         alerts = list(result.scalars().all())
 
-        if lat is not None and lng is not None:
-            user_state = self._resolve_state(lat, lng)
-            alerts = self._filter_by_location(alerts, user_state)
+        if lat is not None and lng is not None and not all_alerts:
+            alerts = self._filter_by_location(alerts, lat, lng)
 
         return alerts
 
@@ -149,69 +127,50 @@ class AlertService:
         return alert
 
     @staticmethod
-    def _resolve_state(lat: float, lng: float) -> str | None:
-        for state_name, _ in INDIAN_STATES.items():
-            if state_name == "delhi" and 28.4 <= lat <= 28.9 and 76.8 <= lng <= 77.4:
-                return "Delhi"
-            if state_name == "karnataka" and 12.5 <= lat <= 18.5 and 74.0 <= lng <= 78.5:
-                return "Karnataka"
-            if state_name == "maharashtra" and 15.5 <= lat <= 22.0 and 72.5 <= lng <= 80.5:
-                return "Maharashtra"
-            if state_name == "goa" and 14.8 <= lat <= 15.8 and 73.6 <= lng <= 74.4:
-                return "Goa"
-            if state_name == "kerala" and 8.0 <= lat <= 12.8 and 74.5 <= lng <= 77.5:
-                return "Kerala"
-            if state_name == "tamil nadu" and 8.0 <= lat <= 13.5 and 76.5 <= lng <= 80.5:
-                return "Tamil Nadu"
-            if state_name == "uttar pradesh" and 23.5 <= lat <= 31.0 and 77.0 <= lng <= 84.5:
-                return "Uttar Pradesh"
-            if state_name == "gujarat" and 20.0 <= lat <= 24.5 and 68.0 <= lng <= 74.5:
-                return "Gujarat"
-            if state_name == "rajasthan" and 23.0 <= lat <= 30.0 and 69.5 <= lng <= 78.0:
-                return "Rajasthan"
-            if state_name == "west bengal" and 21.5 <= lat <= 27.5 and 85.5 <= lng <= 89.5:
-                return "West Bengal"
-            if state_name == "bihar" and 24.0 <= lat <= 27.5 and 83.0 <= lng <= 88.0:
-                return "Bihar"
-            if state_name == "odisha" and 17.5 <= lat <= 22.5 and 81.5 <= lng <= 87.5:
-                return "Odisha"
-            if state_name == "andhra pradesh" and 12.5 <= lat <= 19.5 and 77.0 <= lng <= 84.5:
-                return "Andhra Pradesh"
-            if state_name == "telangana" and 15.5 <= lat <= 19.5 and 77.5 <= lng <= 81.5:
-                return "Telangana"
-            if state_name == "madya pradesh" and 21.0 <= lat <= 26.5 and 74.0 <= lng <= 82.5:
-                return "Madhya Pradesh"
-            if state_name == "chhattisgarh" and 17.5 <= lat <= 24.0 and 80.0 <= lng <= 84.0:
-                return "Chhattisgarh"
-            if state_name == "punjab" and 29.5 <= lat <= 32.5 and 73.5 <= lng <= 76.5:
-                return "Punjab"
-            if state_name == "haryana" and 27.5 <= lat <= 31.0 and 74.5 <= lng <= 77.5:
-                return "Haryana"
-            if state_name == "himachal pradesh" and 30.0 <= lat <= 33.5 and 75.5 <= lng <= 79.0:
-                return "Himachal Pradesh"
-            if state_name == "uttarakhand" and 28.5 <= lat <= 31.5 and 77.5 <= lng <= 81.0:
-                return "Uttarakhand"
-            if state_name == "assam" and 24.0 <= lat <= 28.0 and 89.5 <= lng <= 96.0:
-                return "Assam"
-            if state_name == "jammu" and 32.5 <= lat <= 37.0 and 73.5 <= lng <= 80.0:
-                return "Jammu and Kashmir"
-        return None
-
-    @staticmethod
     def _filter_by_location(
         alerts: list[Alert],
-        user_state: str | None,
+        lat: float,
+        lng: float,
     ) -> list[Alert]:
-        if user_state is None:
-            return [a for a in alerts if _is_nationwide_alert(a.area or "")]
-
         matched: list[Alert] = []
+
         for alert in alerts:
-            area = alert.area or ""
-            if not area:
+            if _is_nationwide(alert.area or ""):
+                matched.append(alert)
                 continue
-            if _is_nationwide_alert(area):
+
+            polygons_text = alert.polygons
+
+            if not polygons_text:
                 matched.append(alert)
-            elif _alert_matches_area(area, user_state):
+                continue
+
+            all_vertices: list[tuple[float, float]] = []
+            inside_polygon = False
+
+            for poly_str in polygons_text.split(";"):
+                poly_str = poly_str.strip()
+                if not poly_str:
+                    continue
+                try:
+                    polygon = _parse_polygon(poly_str)
+                    if len(polygon) < 3:
+                        continue
+                    all_vertices.extend(polygon)
+                    if _point_in_polygon(lat, lng, polygon):
+                        inside_polygon = True
+                        break
+                except (ValueError, IndexError):
+                    continue
+
+            if inside_polygon:
                 matched.append(alert)
+                continue
+
+            if all_vertices:
+                centroid = _polygon_centroid(all_vertices)
+                dist = _haversine(lat, lng, centroid[0], centroid[1])
+                if dist <= SEARCH_RADIUS_KM:
+                    matched.append(alert)
+
         return matched

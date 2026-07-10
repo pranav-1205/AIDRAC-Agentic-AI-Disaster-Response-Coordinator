@@ -10,7 +10,7 @@ export default function LocationStatus({ geolocation }: LocationStatusProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-500">
+      <div className="flex items-center gap-2 text-sm text-on-surface-variant">
         <Crosshair className="h-4 w-4 animate-spin" />
         Acquiring GPS...
       </div>
@@ -28,7 +28,7 @@ export default function LocationStatus({ geolocation }: LocationStatusProps) {
 
   if (permissionDenied) {
     return (
-      <div className="flex items-center gap-2 text-sm text-red-500">
+      <div className="flex items-center gap-2 text-sm text-danger-500">
         <AlertCircle className="h-4 w-4" />
         No GPS permission
       </div>
@@ -37,7 +37,7 @@ export default function LocationStatus({ geolocation }: LocationStatusProps) {
 
   if (error) {
     return (
-      <div className="flex items-center gap-2 text-sm text-orange-500">
+      <div className="flex items-center gap-2 text-sm text-secondary-500">
         <AlertCircle className="h-4 w-4" />
         {error}
       </div>
@@ -46,7 +46,7 @@ export default function LocationStatus({ geolocation }: LocationStatusProps) {
 
   if (position) {
     return (
-      <div className="flex items-center gap-2 text-sm text-green-600">
+      <div className="flex items-center gap-2 text-sm text-success-700">
         <MapPin className="h-4 w-4" />
         {position.lat.toFixed(4)}, {position.lng.toFixed(4)}
       </div>

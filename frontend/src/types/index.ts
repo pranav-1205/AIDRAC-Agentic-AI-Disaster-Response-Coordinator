@@ -65,7 +65,6 @@ export interface Weather {
   rain: number;
   icon: string;
   city: string;
-  is_mock: boolean;
 }
 
 export interface AuthState {
@@ -135,6 +134,25 @@ export interface AIRecommendationRequest {
   question: string;
   lat?: number;
   lng?: number;
+}
+
+export interface UserSettings {
+  id: number;
+  user_id: number;
+  theme: string;
+  accent_color: string;
+  notifications_enabled: boolean;
+  email_notifications: boolean;
+  push_notifications: boolean;
+  sound_alerts: boolean;
+  emergency_radius: number;
+  min_alert_severity: string;
+  default_map_type: string;
+  auto_locate: boolean;
+  show_gov_alerts: boolean;
+  show_user_disasters: boolean;
+  larger_text: boolean;
+  reduced_motion: boolean;
 }
 
 export interface AIRecommendationResponse {

@@ -1,0 +1,61 @@
+# Git
+.git
+.gitignore
+
+# Node
+frontend/node_modules
+frontend/dist
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.venv
+venv
+env
+backend/__pycache__
+backend/.pytest_cache
+backend/.venv
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist
+build
+coverage
+*.egg-info
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Docker
+docker-compose.override.yml
+
+# Cache
+.cache
+.next
+.parcel-cache
+
+# Stitch design exports (not needed at runtime)
+assests/stitch exports
+
+# Misc
+*.tmp
+*.swp

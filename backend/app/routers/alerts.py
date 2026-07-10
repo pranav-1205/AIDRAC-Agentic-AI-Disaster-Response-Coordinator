@@ -13,10 +13,11 @@ router = APIRouter(prefix="/api/alerts", tags=["Alerts"])
 async def get_alerts(
     lat: Optional[float] = Query(None),
     lng: Optional[float] = Query(None),
+    all: bool = Query(False, alias="all"),
     db: AsyncSession = Depends(get_db),
 ):
     service = AlertService(db)
-    return await service.get_all(lat=lat, lng=lng)
+    return await service.get_all(lat=lat, lng=lng, all_alerts=all)
 
 
 @router.post("", response_model=AlertResponse, status_code=201)

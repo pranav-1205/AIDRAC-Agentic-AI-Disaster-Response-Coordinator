@@ -1,5 +1,4 @@
 import type { RouteInfo } from '../types';
-import { haversineDistance } from './haversine';
 
 const ORS_BASE = 'https://api.openrouteservice.org/v2/directions';
 const OSRM_BASE = 'https://router.project-osrm.org/route/v1';
@@ -15,18 +14,10 @@ export async function getRoute(
   const apiKey = getOrsKey();
 
   if (apiKey) {
-    try {
-      return await routeViaORS(start, end, apiKey);
-    } catch {
-      return fallbackRoute(start, end);
-    }
+    return await routeViaORS(start, end, apiKey);
   }
 
-  try {
-    return await routeViaOSRM(start, end);
-  } catch {
-    return fallbackRoute(start, end);
-  }
+  return await routeViaOSRM(start, end);
 }
 
 async function routeViaORS(
@@ -65,7 +56,14 @@ async function routeViaORS(
   );
   const segments = props.segments?.[0] || {};
   const steps: string[] =
-    segments.steps?.map((s: any) => s.instruction) || [];
+    segments.steps?.map((s: any) => {
+      const instruction = s.instruction || '';
+      const dist = s.distance ? ` (${Math.round(s.distance)} m)` : '';
+      if (instruction.toLowerCase().includes('arrive')) {
+        return 'Destination will be on your right.';
+      }
+      return `${instruction}${dist}`;
+    }) || [];
 
   return {
     coordinates: coords,
@@ -92,7 +90,35 @@ async function routeViaOSRM(
     (c: number[]) => [c[1], c[0]]
   );
   const steps: string[] =
-    route.legs?.[0]?.steps?.map((s: any) => s.instruction) || [];
+    route.legs?.[0]?.steps?.map((s: any) => {
+      const dist = s.distance ? ` (${Math.round(s.distance)} m)` : '';
+      if (s.maneuver?.instruction) {
+        const instr = s.maneuver.instruction;
+        if (instr.toLowerCase().includes('arrive') || s.maneuver.type === 'arrive') {
+          return 'Destination will be on your right.';
+        }
+        return `${instr}${dist}`;
+      }
+      const type = s.maneuver?.type || 'continue';
+      const mod = s.maneuver?.modifier || '';
+      const name = s.name || '';
+      if (type === 'arrive') return 'Destination will be on your right.';
+      const dir: Record<string, string> = {
+        turn:           `Turn ${mod}${name ? ` onto ${name}` : ''}`,
+        'new name':     `Continue${name ? ` onto ${name}` : ''}`,
+        continue:       name ? `Continue onto ${name}` : 'Continue',
+        depart:         `Head ${mod}${name ? ` ${name}` : ''}`,
+        arrive:         'Destination will be on your right.',
+        'end of road':  `Turn ${mod} at end of road${name ? ` onto ${name}` : ''}`,
+        roundabout:     `Enter roundabout${name ? ` onto ${name}` : ''}`,
+        fork:           `Keep ${mod} at fork${name ? ` onto ${name}` : ''}`,
+        merge:          `Merge ${mod}${name ? ` onto ${name}` : ''}`,
+        rotary:         `Enter rotary${name ? ` onto ${name}` : ''}`,
+        'exit roundabout': name ? `Exit roundabout onto ${name}` : 'Exit roundabout',
+        'exit rotary':  name ? `Exit rotary onto ${name}` : 'Exit rotary',
+      };
+      return `${dir[type] || `Continue${name ? ` onto ${name}` : ''}`}${dist}`;
+    }) || [];
 
   return {
     coordinates: coords,
@@ -103,29 +129,4 @@ async function routeViaOSRM(
   };
 }
 
-function fallbackRoute(
-  start: [number, number],
-  end: [number, number]
-): RouteInfo {
-  const dist = haversineDistance(start[0], start[1], end[0], end[1]);
-  const midpoint: [number, number] = [
-    (start[0] + end[0]) / 2,
-    (start[1] + end[1]) / 2,
-  ];
 
-  return {
-    coordinates: [
-      [start[0], start[1]],
-      [midpoint[0], midpoint[1]],
-      [end[0], end[1]],
-    ],
-    distanceKm: Math.round(dist * 100) / 100,
-    durationMin: Math.round((dist / 5) * 60),
-    steps: [
-      `Head ${end[0] >= start[0] ? 'north' : 'south'} toward destination`,
-      `Continue for ${dist.toFixed(1)} km`,
-      `Arrive at destination`,
-    ],
-    provider: 'straight-line',
-  };
-}

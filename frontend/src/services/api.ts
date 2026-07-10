@@ -52,8 +52,14 @@ export const disasterApi = {
 };
 
 export const alertApi = {
-  getAll: () => api.get('/alerts'),
+  getAll: (params?: { lat?: number; lng?: number }) =>
+    api.get('/alerts', { params }),
   create: (data: any) => api.post('/alerts', data),
+};
+
+export const settingsApi = {
+  get: () => api.get('/users/settings'),
+  update: (data: Record<string, unknown>) => api.put('/users/settings', data),
 };
 
 export const routeApi = {

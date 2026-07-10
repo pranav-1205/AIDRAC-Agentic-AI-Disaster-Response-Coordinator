@@ -1,7 +1,9 @@
 import { useState, FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { Shield, Eye, EyeOff } from 'lucide-react';
+import MaterialIcon from '../components/ui/MaterialIcon';
 import { useAuth } from '../context/AuthContext';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -29,77 +31,67 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-900 flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center p-6">
+      {/* Decorative background glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary-600/20 blur-[120px] rounded-full pointer-events-none" />
+
+      <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white/10 rounded-2xl mb-4">
-            <Shield className="h-8 w-8 text-emergency-400" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-500/10 border border-primary-500/20 rounded-2xl mb-4 shadow-[0_0_15px_rgba(37,99,235,0.2)]">
+            <MaterialIcon icon="shield" className="h-8 w-8 text-primary-400" />
           </div>
-          <h1 className="text-3xl font-bold text-white">Welcome Back</h1>
-          <p className="text-gray-400 mt-2">Sign in to AIDRAC</p>
+          <h1 className="text-3xl font-bold text-white font-display">Welcome Back</h1>
+          <p className="text-sm font-mono text-slate-400 uppercase tracking-widest mt-2">Initialize Session</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-xl shadow-glow p-8">
           {error && (
-            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4">
+            <div className="bg-danger-500/10 border border-danger-500/20 text-danger-400 text-sm font-mono uppercase tracking-widest p-3 rounded-lg mb-4 text-center">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input-field"
-                placeholder="you@example.com"
-                required
-              />
-            </div>
+            <Input
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+            />
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <label className="label-stitch">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="input-field pr-10"
+                  className="input-stitch pr-10"
                   placeholder="••••••••"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  <MaterialIcon icon={showPassword ? 'visibility_off' : 'visibility'} className="text-xl" />
                 </button>
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full py-2.5 disabled:opacity-50"
-            >
+            <Button type="submit" loading={loading} className="w-full py-2.5">
               {loading ? 'Signing in...' : 'Sign In'}
-            </button>
+            </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-gray-500">
+          <div className="mt-6 text-center text-sm text-slate-400">
             Don't have an account?{' '}
-            <Link to="/register" className="text-primary-500 hover:text-primary-600 font-medium">
+            <Link to="/register" className="text-primary-400 hover:text-primary-300 font-medium">
               Register
             </Link>
-          </div>
-
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-400">
-            <p className="font-medium mb-1">Demo Credentials:</p>
-            <p>Admin: admin@aidrac.com / admin123</p>
-            <p>User: user@aidrac.com / user123</p>
           </div>
         </div>
       </div>

@@ -19,5 +19,4 @@ class OpenWeatherProvider(WeatherProvider):
             lng=lng,
             description=raw.get("description", ""),
             icon=raw.get("icon", ""),
-            is_mock=raw.get("is_mock", False),
         )

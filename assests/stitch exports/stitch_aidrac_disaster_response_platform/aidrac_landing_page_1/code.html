@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIDRAC - AI Disaster Response Coordinator</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary-fixed": "#ffdbca",
+                      "on-surface-variant": "#434655",
+                      "surface-container": "#ededf9",
+                      "tertiary-fixed": "#ffdbcd",
+                      "error-container": "#ffdad6",
+                      "inverse-primary": "#b4c5ff",
+                      "surface-tint": "#0053db",
+                      "secondary": "#9d4300",
+                      "surface-dim": "#d9d9e5",
+                      "outline": "#737686",
+                      "on-surface": "#191b23",
+                      "secondary-container": "#fd761a",
+                      "on-primary-fixed": "#00174b",
+                      "inverse-on-surface": "#f0f0fb",
+                      "on-secondary-fixed": "#341100",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-variant": "#e1e2ed",
+                      "primary": "#004ac6",
+                      "on-primary": "#ffffff",
+                      "secondary-fixed-dim": "#ffb690",
+                      "primary-fixed": "#dbe1ff",
+                      "error": "#ba1a1a",
+                      "primary-container": "#2563eb",
+                      "on-primary-container": "#eeefff",
+                      "on-tertiary-container": "#ffede6",
+                      "on-error-container": "#93000a",
+                      "on-tertiary": "#ffffff",
+                      "background": "#faf8ff",
+                      "tertiary-container": "#bc4800",
+                      "tertiary-fixed-dim": "#ffb596",
+                      "on-tertiary-fixed": "#360f00",
+                      "outline-variant": "#c3c6d7",
+                      "surface-bright": "#faf8ff",
+                      "primary-fixed-dim": "#b4c5ff",
+                      "surface": "#faf8ff",
+                      "on-secondary-fixed-variant": "#783200",
+                      "surface-container-high": "#e7e7f3",
+                      "on-error": "#ffffff",
+                      "on-background": "#191b23",
+                      "on-secondary": "#ffffff",
+                      "tertiary": "#943700",
+                      "surface-container-highest": "#e1e2ed",
+                      "on-tertiary-fixed-variant": "#7d2d00",
+                      "on-secondary-container": "#5c2400",
+                      "surface-container-low": "#f3f3fe",
+                      "inverse-surface": "#2e3039",
+                      "on-primary-fixed-variant": "#003ea8"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "24px",
+                      "stack-sm": "8px",
+                      "card-padding": "20px",
+                      "stack-md": "16px",
+                      "stack-lg": "24px",
+                      "container-padding": "32px",
+                      "unit": "4px"
+              },
+              "fontFamily": {
+                      "display-lg": [
+                              "Geist", "sans-serif"
+                      ],
+                      "headline-lg-mobile": [
+                              "Geist", "sans-serif"
+                      ],
+                      "headline-md": [
+                              "Geist", "sans-serif"
+                      ],
+                      "mono-label": [
+                              "JetBrains Mono", "monospace"
+                      ],
+                      "headline-lg": [
+                              "Geist", "sans-serif"
+                      ],
+                      "body-lg": [
+                              "Geist", "sans-serif"
+                      ],
+                      "body-md": [
+                              "Geist", "sans-serif"
+                      ],
+                      "label-md": [
+                              "Geist", "sans-serif"
+                      ]
+              },
+              "fontSize": {
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.04em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "mono-label": [
+                              "11px",
+                              {
+                                      "lineHeight": "14px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "500"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&display=swap');
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md antialiased overflow-x-hidden">
+<!-- TopNavBar -->
+<header class="bg-surface/80 dark:bg-surface-container/80 backdrop-blur-xl border-b border-outline-variant/30 shadow-sm fixed top-0 w-full flex justify-between items-center px-gutter h-16 z-50">
+<div class="flex items-center gap-stack-md">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">AIDRAC</span>
+</div>
+<div class="flex items-center gap-stack-md">
+<div class="hidden md:flex bg-surface-container-low rounded-full px-4 py-2 border border-outline-variant/50 items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-md p-0 w-48 text-on-surface" placeholder="Search..." type="text"/>
+</div>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant dark:text-outline-variant hover:bg-primary-container/10 transition-colors cursor-pointer active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant dark:text-outline-variant hover:bg-primary-container/10 transition-colors cursor-pointer active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="apps">apps</span>
+</button>
+<img alt="User Profile" class="w-8 h-8 rounded-full object-cover border border-outline-variant/30" data-alt="A professional, high-resolution headshot of a corporate user, well-lit studio photography, neutral background, clean modern aesthetic, symbolizing trust and authority." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCB4xbFb6Z3N3bQoQCuBWYsuZ1A-0fCFqR4SFOmTw3C9bJ09c8dAmumjcwC3xE_F50eKIsS64S70OEjhnbbIInc3fGMsQQhFN9VMI2uedlVaY96thh54WuXhLaJXGBK5I71_aE6LVXxXn158j0AiZzqi5GwCHNCUcD55jEgovnipPq-p3VvblkM_Ix2g8BhFLnX3R_gGuiNzivu2ItC3IFnFKuP3AA2DQSCkujD2uqQRrPgnM7hNXLnjujbr2uJWb0VIv2Xr9vqtQI"/>
+</div>
+</header>
+<main class="pt-16">
+<!-- Hero Section -->
+<section class="relative min-h-[921px] flex items-center justify-center overflow-hidden">
+<!-- Shader Background -->
+<div class="absolute inset-0 z-0 pointer-events-none">
+<!-- STITCH_SHADER_START:ANIMATION_2 class="absolute inset-0 w-full h-full" -->
+<div class="absolute inset-0 w-full h-full" style="display:block;">
+<canvas id="shader-canvas-ANIMATION_2" style="display:block;width:100%;height:100%"></canvas>
+<script>
+(function() {
+  const canvas = document.getElementById('shader-canvas-ANIMATION_2');
+
+  // Sync the WebGL drawing-buffer size with the CSS-driven layout size.
+  // This fires on initial layout and whenever the element is resized.
+  function syncSize() {
+    const w = canvas.clientWidth  || 1280;
+    const h = canvas.clientHeight || 720;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width  = w;
+      canvas.height = h;
+    }
+  }
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(syncSize).observe(canvas);
+  }
+  syncSize();
+
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if (!gl) return;
+  const vs = `attribute vec2 a_position;
+varying vec2 v_texCoord;
+void main() {
+  v_texCoord = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}`;
+  const fs = `precision highp float;
+uniform float u_time;
+uniform vec2 u_resolution;
+
+// Subtle animated world map background with glowing indicators
+// Using noise-based procedural geography and pulsing markers
+
+float hash(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+}
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+    vec2 p = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / min(u_resolution.y, u_resolution.x);
+    
+    // Background color: Clean white/slate blue mix
+    vec3 color = vec3(0.97, 0.98, 1.0);
+    
+    // Procedural map dots (dot grid pattern)
+    vec2 grid = fract(p * 40.0) - 0.5;
+    float dots = smoothstep(0.15, 0.1, length(grid));
+    
+    // Shape the dots into "continents" using noise
+    float n = noise(p * 2.5 + vec2(0.2, 0.1));
+    float mask = smoothstep(0.4, 0.45, n);
+    color = mix(color, vec3(0.145, 0.388, 0.922) * 0.1, dots * mask); // Subtle blue dots for land
+    
+    // Pulsing disaster indicators (Orange #F97316)
+    vec2 centers[3];
+    centers[0] = vec2(0.2, 0.1);
+    centers[1] = vec2(-0.3, -0.2);
+    centers[2] = vec2(0.5, -0.3);
+    
+    for(int i = 0; i < 3; i++) {
+        float d = length(p - centers[i]);
+        float pulse = sin(u_time * 2.0 - d * 10.0) * 0.5 + 0.5;
+        float circle = smoothstep(0.03, 0.01, d);
+        float glow = exp(-d * 20.0) * pulse;
+        
+        vec3 indicatorColor = vec3(0.976, 0.451, 0.086); // #F97316
+        color += indicatorColor * (circle + glow * 0.5);
+    }
+    
+    gl_FragColor = vec4(color, 1.0);
+}`;
+  function cs(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, cs(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, cs(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(prog, 'a_position');
+  gl.enableVertexAttribArray(pos);
+  gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+  const uTime = gl.getUniformLocation(prog, 'u_time');
+  const uRes = gl.getUniformLocation(prog, 'u_resolution');
+  const uMouse = gl.getUniformLocation(prog, 'u_mouse');
+
+  // u_mouse is in pixel coordinates matching u_resolution (ShaderToy convention).
+  // Shaders that need normalized coords should use: u_mouse / u_resolution.
+  let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+  window.addEventListener('mousemove', (event) => {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width && rect.height) {
+      const nx = (event.clientX - rect.left) / rect.width;
+      const ny = 1.0 - (event.clientY - rect.top) / rect.height;
+      mouse.x = nx * canvas.width;
+      mouse.y = ny * canvas.height;
+    }
+  });
+
+  function render(t) {
+    if (typeof ResizeObserver === 'undefined') syncSize();
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    if (uTime) gl.uniform1f(uTime, t * 0.001);
+    if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
+    if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(render);
+  }
+  render(0);
+})();
+</script>
+</div>
+<!-- STITCH_SHADER_END:ANIMATION_2 -->
+<!-- Overlay to ensure text readability -->
+<div class="absolute inset-0 bg-surface/70 backdrop-blur-[2px]"></div>
+<!-- Subtle gradient fade at bottom -->
+<div class="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent"></div>
+</div>
+<div class="relative z-10 container mx-auto px-container-padding flex flex-col items-center text-center max-w-4xl">
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-container/10 border border-primary/20 text-primary font-label-md text-label-md mb-stack-lg">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                    System Status: Operational
+                </div>
+<h1 class="font-display-lg text-display-lg text-on-surface mb-stack-md tracking-tight">
+                    AI Disaster Response <br class="hidden md:block"/>
+<span class="text-primary">Coordinator</span>
+</h1>
+<p class="font-headline-md text-headline-md text-on-surface-variant mb-stack-xl max-w-2xl font-normal leading-relaxed">
+                    Real-time disaster intelligence powered by Agentic AI. Unify data streams, automate evacuation logistics, and deploy resources with unprecedented precision.
+                </p>
+<div class="flex flex-col sm:flex-row items-center gap-stack-md w-full sm:w-auto">
+<button class="w-full sm:w-auto bg-primary text-on-primary px-8 py-3.5 rounded-lg font-label-md text-label-md font-semibold hover:bg-primary/90 transition-all shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] hover:-translate-y-0.5 duration-200">
+                        Get Started
+                    </button>
+<button class="w-full sm:w-auto bg-surface/50 backdrop-blur-md border border-outline-variant text-primary px-8 py-3.5 rounded-lg font-label-md text-label-md font-semibold hover:bg-surface/80 transition-all hover:-translate-y-0.5 duration-200">
+                        Live Demo
+                    </button>
+</div>
+</div>
+</section>
+<!-- Feature Section (Bento Grid Style) -->
+<section class="py-24 px-container-padding bg-background relative z-10">
+<div class="container mx-auto max-w-7xl">
+<div class="text-center mb-16">
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-stack-sm">Platform Capabilities</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto">Comprehensive tools designed for high-stakes decision-makers to manage crisis scenarios systematically.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Feature 1 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl p-card-padding shadow-[0_1px_3px_0_rgba(0,0,0,0.1),_0_1px_2px_-1px_rgba(0,0,0,0.1)] hover:shadow-md transition-shadow group">
+<div class="w-12 h-12 rounded-lg bg-primary-container/10 flex items-center justify-center text-primary mb-stack-md group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-stack-sm">Live Disaster Monitoring</h3>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">Continuous ingestion of multispectral satellite imagery and ground sensor data for real-time situational awareness.</p>
+</div>
+<!-- Feature 2 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl p-card-padding shadow-[0_1px_3px_0_rgba(0,0,0,0.1),_0_1px_2px_-1px_rgba(0,0,0,0.1)] hover:shadow-md transition-shadow group">
+<div class="w-12 h-12 rounded-lg bg-primary-container/10 flex items-center justify-center text-primary mb-stack-md group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="route">route</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-stack-sm">AI Evacuation Planning</h3>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">Dynamic routing algorithms that adapt to evolving hazards, traffic density, and infrastructure integrity.</p>
+</div>
+<!-- Feature 3 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl p-card-padding shadow-[0_1px_3px_0_rgba(0,0,0,0.1),_0_1px_2px_-1px_rgba(0,0,0,0.1)] hover:shadow-md transition-shadow group">
+<div class="w-12 h-12 rounded-lg bg-primary-container/10 flex items-center justify-center text-primary mb-stack-md group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="home_pin">home_pin</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-stack-sm">Smart Shelter Recommendation</h3>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">Automated matching of displaced populations with available safe zones based on capacity and specific needs.</p>
+</div>
+<!-- Feature 4 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl p-card-padding shadow-[0_1px_3px_0_rgba(0,0,0,0.1),_0_1px_2px_-1px_rgba(0,0,0,0.1)] hover:shadow-md transition-shadow group lg:col-span-2 lg:flex lg:gap-stack-md lg:items-center">
+<div class="lg:w-1/3">
+<div class="w-12 h-12 rounded-lg bg-error/10 flex items-center justify-center text-error mb-stack-md group-hover:bg-error group-hover:text-on-error transition-colors">
+<span class="material-symbols-outlined" data-icon="emergency_home">emergency_home</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-stack-sm">Emergency Alerts</h3>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">Hyper-localized, multi-channel broadcast system for critical citizen communications.</p>
+</div>
+<div class="hidden lg:block lg:w-2/3 h-full min-h-[160px] bg-surface-container rounded-lg border border-surface-variant p-4 relative overflow-hidden">
+<!-- Faux UI for visual interest -->
+<div class="flex flex-col gap-2 relative z-10">
+<div class="w-full bg-surface-container-lowest p-3 rounded-md shadow-sm border border-outline-variant/30 flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-error animate-pulse"></div>
+<div class="flex-1">
+<div class="h-2 w-24 bg-surface-variant rounded mb-1"></div>
+<div class="h-2 w-48 bg-surface-dim rounded"></div>
+</div>
+<span class="font-mono-label text-mono-label text-outline">Just now</span>
+</div>
+<div class="w-full bg-surface-container-lowest p-3 rounded-md shadow-sm border border-outline-variant/30 flex items-center gap-3 opacity-60">
+<div class="w-2 h-2 rounded-full bg-secondary-container"></div>
+<div class="flex-1">
+<div class="h-2 w-32 bg-surface-variant rounded mb-1"></div>
+<div class="h-2 w-40 bg-surface-dim rounded"></div>
+</div>
+<span class="font-mono-label text-mono-label text-outline">2m ago</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Feature 5 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl p-card-padding shadow-[0_1px_3px_0_rgba(0,0,0,0.1),_0_1px_2px_-1px_rgba(0,0,0,0.1)] hover:shadow-md transition-shadow group">
+<div class="w-12 h-12 rounded-lg bg-primary-container/10 flex items-center justify-center text-primary mb-stack-md group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="medical_services">medical_services</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-stack-sm">Medical Assistance</h3>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">Triage coordination and supply chain tracking for deployed field hospitals and EMS teams.</p>
+</div>
+<!-- Feature 6 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl p-card-padding shadow-[0_1px_3px_0_rgba(0,0,0,0.1),_0_1px_2px_-1px_rgba(0,0,0,0.1)] hover:shadow-md transition-shadow group lg:col-span-3">
+<div class="flex flex-col md:flex-row items-start md:items-center gap-stack-lg">
+<div class="w-12 h-12 rounded-lg bg-primary-container/10 flex shrink-0 items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="cloud">cloud</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-stack-sm">Weather Intelligence Integration</h3>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed max-w-4xl">Seamless connection with global meteorological databases providing predictive modeling for storm trajectories, flood plains, and extreme temperature anomalies, enabling proactive stance adjustments before impact.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-highest dark:bg-inverse-surface border-t border-outline-variant w-full flex flex-col md:flex-row justify-between items-center px-gutter gap-stack-md py-stack-md">
+<div class="font-headline-md text-headline-md font-bold text-primary">
+            AIDRAC
+        </div>
+<div class="font-label-md text-label-md text-on-surface dark:text-inverse-on-surface text-center">
+            © 2024 AIDRAC Agentic Systems
+        </div>
+<div class="flex items-center gap-stack-md font-label-md text-label-md">
+<a class="text-on-surface-variant hover:text-primary underline transition-opacity hover:opacity-80" href="#">Privacy Policy</a>
+<a class="text-on-surface-variant hover:text-primary underline transition-opacity hover:opacity-80" href="#">Terms of Service</a>
+<a class="text-on-surface-variant hover:text-primary underline transition-opacity hover:opacity-80" href="#">Emergency Protocols</a>
+</div>
+</footer>
+</body></html>

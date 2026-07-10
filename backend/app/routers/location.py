@@ -45,7 +45,7 @@ def score_destination(
 async def get_nearby(
     lat: float = Query(..., ge=-90, le=90),
     lng: float = Query(..., ge=-180, le=180),
-    radius: int = Query(DEFAULT_RADIUS, ge=100, le=50_000),
+    radius: int = Query(DEFAULT_RADIUS, ge=100, le=100_000),
 ):
     hospitals, shelters, community_centres, schools, police, firestations, pharmacies = await asyncio.gather(
         _service.get_nearby_hospitals(lat, lng, radius),
@@ -71,7 +71,7 @@ async def get_nearby(
 async def get_safe_destination(
     lat: float = Query(..., ge=-90, le=90),
     lng: float = Query(..., ge=-180, le=180),
-    radius: int = Query(DEFAULT_RADIUS, ge=100, le=50_000),
+    radius: int = Query(DEFAULT_RADIUS, ge=100, le=100_000),
 ):
     categories = await asyncio.gather(
         _service.get_nearby_hospitals(lat, lng, radius),

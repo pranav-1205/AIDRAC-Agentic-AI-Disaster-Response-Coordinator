@@ -11,6 +11,9 @@ dist/
 venv/
 .venv/
 
+# Local design assets
+assets/
+
 # Node
 node_modules/
 frontend/dist/

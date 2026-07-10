@@ -11,6 +11,13 @@ from app.services.disaster_sources.normalizer import alert_data_to_dict
 from app.config.settings import settings
 
 logger = logging.getLogger("aidrac.disaster_sources.background_refresh")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _sh = logging.StreamHandler()
+    _sh.setLevel(logging.INFO)
+    _sh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%H:%M:%S"))
+    logger.addHandler(_sh)
+    logger.propagate = False
 
 
 class BackgroundIngestion:
@@ -63,7 +70,6 @@ class BackgroundIngestion:
 
         async with self._session_factory() as db:
             try:
-                await self._mark_demo_inactive(db)
                 await self._sync_alerts(db, cap_alerts)
                 await self._expire_old(db)
                 await self._purge_old_history(db)
@@ -73,22 +79,6 @@ class BackgroundIngestion:
                 await db.rollback()
                 logger.exception("Background ingestion: transaction rolled back")
 
-    async def _mark_demo_inactive(self, db: AsyncSession) -> None:
-        result = await db.execute(
-            select(Alert).where(
-                Alert.external_id.is_(None),
-                Alert.is_active.is_(True),
-            )
-        )
-        rows = list(result.scalars().all())
-        now = datetime.now(timezone.utc)
-        for row in rows:
-            row.is_active = False
-            row.expired_at = now
-        if rows:
-            await db.flush()
-            logger.info("Marked %d demo alerts as inactive", len(rows))
-
     async def _sync_alerts(self, db: AsyncSession, cap_alerts: list) -> None:
         result = await db.execute(
             select(Alert).where(Alert.external_id.isnot(None))
@@ -96,6 +86,8 @@ class BackgroundIngestion:
         existing_rows = result.scalars().all()
         existing = {r.external_id: r for r in existing_rows if r.external_id}
 
+        inserted = 0
+        updated = 0
         for alert_data in cap_alerts:
             fields = alert_data_to_dict(alert_data)
             row = existing.get(alert_data.external_id)
@@ -106,11 +98,14 @@ class BackgroundIngestion:
                 if not row.is_active:
                     row.is_active = True
                     row.expired_at = None
+                updated += 1
             else:
                 row = Alert(**fields, is_active=True)
                 db.add(row)
+                inserted += 1
 
         await db.flush()
+        logger.info("Background sync: %d inserted, %d updated", inserted, updated)
 
     async def _expire_old(self, db: AsyncSession) -> None:
         now = datetime.now(timezone.utc)

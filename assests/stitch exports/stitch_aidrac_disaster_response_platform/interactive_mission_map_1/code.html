@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIDRAC - Live Map</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary-fixed": "#ffdbca",
+                      "on-surface-variant": "#434655",
+                      "surface-container": "#ededf9",
+                      "tertiary-fixed": "#ffdbcd",
+                      "error-container": "#ffdad6",
+                      "inverse-primary": "#b4c5ff",
+                      "surface-tint": "#0053db",
+                      "secondary": "#9d4300",
+                      "surface-dim": "#d9d9e5",
+                      "outline": "#737686",
+                      "on-surface": "#191b23",
+                      "secondary-container": "#fd761a",
+                      "on-primary-fixed": "#00174b",
+                      "inverse-on-surface": "#f0f0fb",
+                      "on-secondary-fixed": "#341100",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-variant": "#e1e2ed",
+                      "primary": "#004ac6",
+                      "on-primary": "#ffffff",
+                      "secondary-fixed-dim": "#ffb690",
+                      "primary-fixed": "#dbe1ff",
+                      "error": "#ba1a1a",
+                      "primary-container": "#2563eb",
+                      "on-primary-container": "#eeefff",
+                      "on-tertiary-container": "#ffede6",
+                      "on-error-container": "#93000a",
+                      "on-tertiary": "#ffffff",
+                      "background": "#faf8ff",
+                      "tertiary-container": "#bc4800",
+                      "tertiary-fixed-dim": "#ffb596",
+                      "on-tertiary-fixed": "#360f00",
+                      "outline-variant": "#c3c6d7",
+                      "surface-bright": "#faf8ff",
+                      "primary-fixed-dim": "#b4c5ff",
+                      "surface": "#faf8ff",
+                      "on-secondary-fixed-variant": "#783200",
+                      "surface-container-high": "#e7e7f3",
+                      "on-error": "#ffffff",
+                      "on-background": "#191b23",
+                      "on-secondary": "#ffffff",
+                      "tertiary": "#943700",
+                      "surface-container-highest": "#e1e2ed",
+                      "on-tertiary-fixed-variant": "#7d2d00",
+                      "on-secondary-container": "#5c2400",
+                      "surface-container-low": "#f3f3fe",
+                      "inverse-surface": "#2e3039",
+                      "on-primary-fixed-variant": "#003ea8"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "24px",
+                      "stack-sm": "8px",
+                      "card-padding": "20px",
+                      "stack-md": "16px",
+                      "stack-lg": "24px",
+                      "container-padding": "32px",
+                      "unit": "4px"
+              },
+              "fontFamily": {
+                      "display-lg": ["Geist"],
+                      "headline-lg-mobile": ["Geist"],
+                      "headline-md": ["Geist"],
+                      "mono-label": ["JetBrains Mono"],
+                      "headline-lg": ["Geist"],
+                      "body-lg": ["Geist"],
+                      "body-md": ["Geist"],
+                      "label-md": ["Geist"]
+              },
+              "fontSize": {
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.04em", "fontWeight": "700"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "headline-md": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "mono-label": ["11px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400"}],
+                      "body-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400"}],
+                      "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        .pulse-ring {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .5; transform: scale(1.5); }
+        }
+        .evac-route {
+            background: repeating-linear-gradient(90deg, #004ac6, #004ac6 10px, transparent 10px, transparent 20px);
+            background-size: 20px 100%;
+            animation: moveRoute 1s linear infinite;
+        }
+        @keyframes moveRoute {
+            0% { background-position: 0 0; }
+            100% { background-position: 20px 0; }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background h-screen w-screen overflow-hidden flex font-body-md text-body-md">
+<!-- SideNavBar (from JSON) -->
+<nav class="fixed left-0 top-0 h-full w-[280px] hidden lg:flex flex-col bg-surface-container-low border-r border-outline-variant/20 p-stack-lg gap-stack-sm z-50">
+<div class="mb-stack-lg flex flex-col gap-unit">
+<span class="font-headline-md text-headline-md font-black text-primary">AIDRAC</span>
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-widest">Crisis Response</span>
+</div>
+<div class="flex flex-col gap-unit flex-grow">
+<!-- Inactive -->
+<a class="flex items-center gap-stack-sm px-stack-md py-stack-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-md text-label-md rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
+<span>Dashboard</span>
+</a>
+<!-- Active -->
+<a class="flex items-center gap-stack-sm px-stack-md py-stack-sm bg-primary-container text-on-primary-container font-semibold rounded-lg font-label-md text-label-md transition-all duration-200 ease-in-out shadow-[0_1px_3px_0_rgba(0,0,0,0.1),_0_1px_2px_-1px_rgba(0,0,0,0.1)]" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="map">map</span>
+<span>Live Map</span>
+</a>
+<!-- Inactive -->
+<a class="flex items-center gap-stack-sm px-stack-md py-stack-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-md text-label-md rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="home_pin">home_pin</span>
+<span>Shelters</span>
+</a>
+<a class="flex items-center gap-stack-sm px-stack-md py-stack-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-md text-label-md rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="local_hospital">local_hospital</span>
+<span>Hospitals</span>
+</a>
+<a class="flex items-center gap-stack-sm px-stack-md py-stack-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-md text-label-md rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="sensors">sensors</span>
+<span>Monitoring</span>
+</a>
+<a class="flex items-center gap-stack-sm px-stack-md py-stack-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-md text-label-md rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="emergency">emergency</span>
+<span>Alerts</span>
+</a>
+<a class="flex items-center gap-stack-sm px-stack-md py-stack-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-md text-label-md rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="smart_toy">smart_toy</span>
+<span>AI Assistant</span>
+</a>
+<a class="flex items-center gap-stack-sm px-stack-md py-stack-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-md text-label-md rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="analytics">analytics</span>
+<span>Analytics</span>
+</a>
+<a class="flex items-center gap-stack-sm px-stack-md py-stack-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all duration-200 ease-in-out font-label-md text-label-md rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</div>
+<button class="w-full mt-auto bg-error text-on-error py-stack-md px-stack-md rounded-lg font-label-md text-label-md font-bold flex items-center justify-center gap-stack-sm hover:opacity-90 transition-opacity shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+<span class="material-symbols-outlined" data-icon="warning" style="font-variation-settings: 'FILL' 1;">warning</span>
+            Emergency SOS
+        </button>
+<div class="mt-stack-md flex flex-col gap-unit pt-stack-sm border-t border-outline-variant/20">
+<a class="flex items-center gap-stack-sm px-stack-md py-stack-sm text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-all" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="help">help</span>
+                Help Center
+            </a>
+<a class="flex items-center gap-stack-sm px-stack-md py-stack-sm text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-all" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="contact_support">contact_support</span>
+                Support
+            </a>
+</div>
+</nav>
+<!-- Main Map Area -->
+<main class="relative h-full w-full lg:ml-[280px] bg-inverse-surface">
+<!-- Map Background (Placeholder Image for dark technical map) -->
+<div class="absolute inset-0 bg-cover bg-center z-0 opacity-80" data-alt="A highly detailed, futuristic digital map visualization in dark mode. The map shows intricate street grids and topographical data glowing faintly against a deep black background. Neon blue and subdued cyan accents highlight waterways and major arteries. The aesthetic is extremely high-tech, precise, and cinematic, resembling a crisis management center display screen with high-contrast elements and no textual labels." data-location="Global" style="background-image: url('https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg')"></div>
+<!-- Evacuation Routes (Simulated) -->
+<div class="absolute top-[30%] left-[20%] w-[300px] h-[4px] evac-route z-10 transform rotate-12 opacity-80 rounded-full shadow-[0_0_8px_#004ac6]"></div>
+<div class="absolute top-[50%] left-[40%] w-[400px] h-[4px] evac-route z-10 transform -rotate-12 opacity-80 rounded-full shadow-[0_0_8px_#004ac6]"></div>
+<!-- Map Markers -->
+<!-- User Location (Blue pulse) -->
+<div class="absolute top-[45%] left-[35%] z-20 flex items-center justify-center">
+<div class="absolute w-8 h-8 rounded-full bg-primary/30 pulse-ring"></div>
+<div class="relative w-4 h-4 rounded-full bg-primary border-2 border-on-primary shadow-sm flex items-center justify-center"></div>
+</div>
+<!-- Disaster Zone (Orange/Red pulse) -->
+<div class="absolute top-[25%] left-[55%] z-10 flex items-center justify-center">
+<div class="absolute w-32 h-32 rounded-full bg-error/20 pulse-ring" style="animation-duration: 3s;"></div>
+<div class="absolute w-16 h-16 rounded-full bg-error/40 pulse-ring" style="animation-duration: 1.5s;"></div>
+<span class="material-symbols-outlined text-error text-[32px] drop-shadow-md" data-icon="warning" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<!-- Shelters (Green/Primary Pins) -->
+<div class="absolute top-[60%] left-[30%] z-20 transform -translate-x-1/2 -translate-y-full flex flex-col items-center">
+<div class="bg-surface text-primary rounded-full p-1 shadow-md border border-outline-variant/30">
+<span class="material-symbols-outlined text-[20px]" data-icon="home_pin" style="font-variation-settings: 'FILL' 1;">home_pin</span>
+</div>
+<div class="w-1 h-3 bg-surface border-x border-b border-outline-variant/30"></div>
+</div>
+<div class="absolute top-[40%] left-[65%] z-20 transform -translate-x-1/2 -translate-y-full flex flex-col items-center">
+<div class="bg-surface text-primary rounded-full p-1 shadow-md border border-outline-variant/30">
+<span class="material-symbols-outlined text-[20px]" data-icon="home_pin" style="font-variation-settings: 'FILL' 1;">home_pin</span>
+</div>
+<div class="w-1 h-3 bg-surface border-x border-b border-outline-variant/30"></div>
+</div>
+<!-- Hospitals (Red Cross) -->
+<div class="absolute top-[35%] left-[25%] z-20 transform -translate-x-1/2 -translate-y-full flex flex-col items-center">
+<div class="bg-surface text-error rounded-full p-1 shadow-md border border-outline-variant/30">
+<span class="material-symbols-outlined text-[20px]" data-icon="local_hospital" style="font-variation-settings: 'FILL' 1;">local_hospital</span>
+</div>
+<div class="w-1 h-3 bg-surface border-x border-b border-outline-variant/30"></div>
+</div>
+<!-- FLOATING UI LAYERS (Z-30+) -->
+<!-- Top Controls (Search & Actions) -->
+<div class="absolute top-0 left-0 w-full p-gutter flex justify-between items-start z-30 pointer-events-none">
+<!-- Search Bar -->
+<div class="pointer-events-auto flex items-center bg-surface/90 backdrop-blur-md border border-outline-variant/30 shadow-[0_1px_3px_0_rgba(0,0,0,0.1),_0_1px_2px_-1px_rgba(0,0,0,0.1)] rounded-xl w-full max-w-md h-12 px-stack-md transition-all focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+<span class="material-symbols-outlined text-on-surface-variant mr-stack-sm" data-icon="search">search</span>
+<input class="w-full bg-transparent border-none outline-none text-on-surface font-body-md placeholder-on-surface-variant/70 focus:ring-0 p-0" placeholder="Search locations, shelters..." type="text"/>
+<button class="ml-stack-sm text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="mic">mic</span>
+</button>
+</div>
+<!-- Right Actions -->
+<div class="pointer-events-auto flex items-center gap-stack-md">
+<!-- Layer Toggle -->
+<div class="flex bg-surface/90 backdrop-blur-md border border-outline-variant/30 rounded-lg p-1 shadow-sm">
+<button class="px-3 py-1.5 rounded-md bg-surface-container-high text-on-surface font-label-md text-label-md shadow-sm transition-colors">Map</button>
+<button class="px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors">Satellite</button>
+<button class="px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="layers">layers</span>
+                        Layers
+                    </button>
+</div>
+<!-- Emergency Mode Button -->
+<button class="bg-error text-on-error px-stack-lg py-3 rounded-lg font-label-md text-label-md font-bold shadow-[0_4px_14px_0_rgba(186,26,26,0.39)] hover:shadow-[0_6px_20px_rgba(186,26,26,0.23)] hover:-translate-y-0.5 transition-all flex items-center gap-2 uppercase tracking-wide">
+<span class="material-symbols-outlined" data-icon="cell_tower" style="font-variation-settings: 'FILL' 1;">cell_tower</span>
+                    Emergency Mode
+                </button>
+</div>
+</div>
+<!-- Bottom Detail Card -->
+<div class="absolute bottom-gutter left-gutter z-30 pointer-events-auto w-full max-w-sm">
+<div class="bg-surface/95 backdrop-blur-xl border border-outline-variant/30 rounded-2xl p-card-padding shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1),_0_8px_10px_-6px_rgba(0,0,0,0.1)] flex flex-col gap-stack-md relative overflow-hidden">
+<!-- Decorative top line -->
+<div class="absolute top-0 left-0 w-full h-1 bg-primary"></div>
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="home_pin" style="font-variation-settings: 'FILL' 1;">home_pin</span>
+                            Community Hall A
+                        </h3>
+<p class="font-body-sm text-on-surface-variant mt-1">Nearest designated safe shelter</p>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+</div>
+<div class="grid grid-cols-2 gap-stack-sm">
+<div class="bg-surface-container-low p-stack-sm rounded-lg border border-outline-variant/20 flex flex-col gap-1">
+<span class="font-mono-label text-mono-label text-on-surface-variant uppercase">Distance</span>
+<span class="font-headline-md text-headline-md text-on-surface">1.4 km</span>
+</div>
+<div class="bg-surface-container-low p-stack-sm rounded-lg border border-outline-variant/20 flex flex-col gap-1">
+<span class="font-mono-label text-mono-label text-on-surface-variant uppercase">ETA (Walk)</span>
+<span class="font-headline-md text-headline-md text-on-surface">8 min</span>
+</div>
+</div>
+<div>
+<div class="flex justify-between items-center mb-1">
+<span class="font-label-md text-label-md text-on-surface">Capacity</span>
+<span class="font-label-md text-label-md text-on-surface font-bold">85%</span>
+</div>
+<div class="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-secondary-container rounded-full w-[85%]"></div>
+</div>
+</div>
+<div class="flex gap-stack-sm mt-2">
+<button class="flex-1 bg-primary text-on-primary py-2 rounded-lg font-label-md text-label-md font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="directions">directions</span>
+                        Route
+                    </button>
+<button class="flex-1 border border-outline text-on-surface py-2 rounded-lg font-label-md text-label-md font-semibold hover:bg-surface-container-high transition-colors">
+                        Details
+                    </button>
+</div>
+</div>
+</div>
+<!-- Floating Action Buttons (Bottom Right) -->
+<div class="absolute bottom-gutter right-gutter z-30 pointer-events-auto flex flex-col gap-stack-sm">
+<button class="w-12 h-12 bg-surface text-on-surface rounded-full shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] border border-outline-variant/30 flex items-center justify-center hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="my_location">my_location</span>
+</button>
+<div class="flex flex-col rounded-lg shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] border border-outline-variant/30 overflow-hidden">
+<button class="w-12 h-12 bg-surface text-on-surface flex items-center justify-center hover:bg-surface-container-high transition-colors border-b border-outline-variant/30">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+<button class="w-12 h-12 bg-surface text-on-surface flex items-center justify-center hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="remove">remove</span>
+</button>
+</div>
+</div>
+</main>
+</body></html>

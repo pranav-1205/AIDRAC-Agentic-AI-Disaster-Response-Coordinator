@@ -79,7 +79,7 @@ class LocationService:
         try:
             raw = await self._overpass.query(q)
         except OverpassError:
-            return self._cache.get(key, (0, []))[1] if key in self._cache else []
+            return []
 
         results = []
         for item in raw:

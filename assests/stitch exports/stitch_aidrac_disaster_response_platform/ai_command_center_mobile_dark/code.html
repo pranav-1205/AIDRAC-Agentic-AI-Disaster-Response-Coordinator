@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+
+<html class="h-full dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<title>AIDRAC - Mobile AI Assistant</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "error": "#ba1a1a",
+                "secondary-fixed": "#ffdbca",
+                "secondary": "#9d4300",
+                "surface-container": "#ededf9",
+                "surface-container-low": "#f3f3fe",
+                "on-error": "#ffffff",
+                "surface-tint": "#0053db",
+                "inverse-surface": "#2e3039",
+                "surface-container-highest": "#e1e2ed",
+                "on-primary-fixed-variant": "#003ea8",
+                "on-primary-fixed": "#00174b",
+                "on-tertiary-container": "#ffede6",
+                "inverse-on-surface": "#f0f0fb",
+                "primary": "#004ac6",
+                "error-container": "#ffdad6",
+                "on-secondary-container": "#5c2400",
+                "tertiary-fixed-dim": "#ffb596",
+                "outline-variant": "#c3c6d7",
+                "on-surface-variant": "#434655",
+                "primary-fixed-dim": "#b4c5ff",
+                "primary-fixed": "#dbe1ff",
+                "on-tertiary": "#ffffff",
+                "surface-variant": "#e1e2ed",
+                "surface-dim": "#d9d9e5",
+                "surface-container-lowest": "#ffffff",
+                "on-surface": "#191b23",
+                "on-primary": "#ffffff",
+                "inverse-primary": "#b4c5ff",
+                "primary-container": "#2563eb",
+                "surface-container-high": "#e7e7f3",
+                "tertiary": "#943700",
+                "surface-bright": "#faf8ff",
+                "on-secondary-fixed-variant": "#783200",
+                "on-error-container": "#93000a",
+                "on-secondary-fixed": "#341100",
+                "on-background": "#191b23",
+                "on-tertiary-fixed": "#360f00",
+                "tertiary-container": "#bc4800",
+                "on-secondary": "#ffffff",
+                "outline": "#737686",
+                "secondary-container": "#fd761a",
+                "on-tertiary-fixed-variant": "#7d2d00",
+                "secondary-fixed-dim": "#ffb690",
+                "tertiary-fixed": "#ffdbcd",
+                "surface": "#faf8ff",
+                "on-primary-container": "#eeefff",
+                "background": "#faf8ff"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "container-padding": "32px",
+                "unit": "4px",
+                "stack-sm": "8px",
+                "card-padding": "20px",
+                "gutter": "24px",
+                "stack-md": "16px",
+                "stack-lg": "24px"
+        },
+        "fontFamily": {
+                "mono-label": [
+                        "JetBrains Mono"
+                ],
+                "label-md": [
+                        "Geist"
+                ],
+                "headline-lg-mobile": [
+                        "Geist"
+                ],
+                "headline-lg": [
+                        "Geist"
+                ],
+                "display-lg": [
+                        "Geist"
+                ],
+                "body-md": [
+                        "Geist"
+                ],
+                "headline-md": [
+                        "Geist"
+                ],
+                "body-lg": [
+                        "Geist"
+                ]
+        },
+        "fontSize": {
+                "mono-label": [
+                        "11px",
+                        {
+                                "lineHeight": "14px",
+                                "letterSpacing": "0.02em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "label-md": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "display-lg": [
+                        "48px",
+                        {
+                                "lineHeight": "56px",
+                                "letterSpacing": "-0.04em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "body-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "letterSpacing": "0em",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-md": [
+                        "20px",
+                        {
+                                "lineHeight": "28px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-lg": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "letterSpacing": "0em",
+                                "fontWeight": "400"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        body { -webkit-tap-highlight-color: transparent; }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
+        .pt-safe { padding-top: env(safe-area-inset-top, 20px); }
+        
+        /* Agent Ring Pulse Animation */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
+            70% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
+            100% { transform: scale(0.8); opacity: 0.5; box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+        }
+        .ai-pulse-ring {
+            animation: pulse-ring 2s infinite cubic-bezier(0.66, 0, 0, 1);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background dark:bg-neutral-950 text-on-background dark:text-neutral-100 h-full w-full overflow-hidden flex flex-col font-body-md text-body-md antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/90 dark:bg-neutral-900/90 backdrop-blur-xl border-b border-outline-variant/30 dark:border-neutral-800 shadow-sm flex justify-between items-center px-4 h-16 pt-safe">
+<button class="text-primary hover:bg-surface-container-high dark:hover:bg-neutral-800 transition-colors active:scale-95 duration-200 p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">emergency</span>
+</button>
+<div class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary tracking-tight">AIDRAC</div>
+<button class="text-primary hover:bg-surface-container-high dark:hover:bg-neutral-800 transition-colors active:scale-95 duration-200 p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</header>
+<!-- Chat Canvas -->
+<main class="flex-1 overflow-y-auto w-full pt-[calc(64px+env(safe-area-inset-top,0px))] pb-[calc(140px+env(safe-area-inset-bottom,0px))] px-4 flex flex-col gap-stack-md">
+<!-- User Message -->
+<div class="flex justify-end mt-4">
+<div class="bg-primary text-on-primary rounded-2xl rounded-tr-sm px-4 py-3 max-w-[85%] shadow-sm">
+<p class="font-body-md text-body-md">What is the current status of Sector 4? I heard reports of rising water levels.</p>
+</div>
+</div>
+<!-- AI Response Container -->
+<div class="flex flex-col gap-stack-sm w-full max-w-[95%]">
+<!-- AI Header -->
+<div class="flex items-center gap-2 mb-1">
+<div class="relative flex items-center justify-center w-6 h-6 rounded-full bg-primary-container/20 dark:bg-primary-container/40">
+<div class="absolute inset-0 rounded-full border border-primary dark:border-inverse-primary ai-pulse-ring"></div>
+<span class="material-symbols-outlined text-primary dark:text-inverse-primary text-[14px]">smart_toy</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant dark:text-neutral-400 uppercase tracking-wider">AIDRAC Agent analyzing...</span>
+</div>
+<!-- Main AI Assessment Card -->
+<div class="bg-surface dark:bg-neutral-900 border border-outline-variant/50 dark:border-neutral-800 rounded-[16px] shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)] overflow-hidden">
+<!-- Card Header -->
+<div class="p-4 border-b border-outline-variant/30 dark:border-neutral-800 flex justify-between items-start bg-surface-container-low dark:bg-neutral-900">
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface dark:text-neutral-100 mb-1">Flood Assessment</h2>
+<p class="font-mono-label text-mono-label text-on-surface-variant dark:text-neutral-400">SECTOR 4 • T+00:02:15</p>
+</div>
+<div class="bg-error/10 px-3 py-1 rounded-full border border-error/20 flex items-center gap-1.5">
+<div class="w-2 h-2 rounded-full bg-error dark:bg-[#ffb4ab] animate-pulse"></div>
+<span class="font-label-md text-label-md text-error dark:text-[#ffb4ab] font-bold tracking-widest uppercase">High Risk</span>
+</div>
+</div>
+<!-- Card Body - Data -->
+<div class="p-4 flex flex-col gap-4">
+<p class="font-body-md text-body-md text-on-surface dark:text-neutral-200">Sector 4 is experiencing rapid water level rise. Evacuation protocol initiated for low-lying residential zones.</p>
+<div class="grid grid-cols-2 gap-3">
+<div class="bg-surface-container dark:bg-neutral-800 p-3 rounded-lg flex flex-col gap-1">
+<span class="font-label-md text-label-md text-on-surface-variant dark:text-neutral-400">Nearest Shelter</span>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary dark:text-inverse-primary text-[18px]">shelves</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface dark:text-neutral-100">Community Hall A</span>
+</div>
+<span class="font-mono-label text-mono-label text-on-surface-variant dark:text-neutral-400 mt-1">1.2 km away • Capacity: 85%</span>
+</div>
+<div class="bg-surface-container dark:bg-neutral-800 p-3 rounded-lg flex flex-col gap-1">
+<span class="font-label-md text-label-md text-on-surface-variant dark:text-neutral-400">Est. Time to Impact</span>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary-container dark:text-secondary-fixed text-[18px]">timer</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface dark:text-neutral-100">~45 Minutes</span>
+</div>
+<span class="font-mono-label text-mono-label text-on-surface-variant dark:text-neutral-400 mt-1">River overflow projected</span>
+</div>
+</div>
+<!-- Map/Route Visual -->
+<div class="rounded-lg overflow-hidden border border-outline-variant/30 dark:border-neutral-800 h-32 relative group cursor-pointer">
+<div class="bg-cover bg-center w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" data-alt="A clean, minimalist high-tech map interface in light mode, showing a city grid with a highlighted neon blue escape route avoiding a red flood zone. Corporate SaaS aesthetic, precise lines, subtle shadows, professional emergency response context." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB_Pjuyb1PXNm9dNt24wB5a7uGb478hSf9Uw32IvTNavDdKdbUj_40WyE9mGZWGe_PnXLMXo9Mo-rd4CkNEYTpTUPj0NeTWJ59cFtaBarJXKqkZnVuscLLecRT6SSkIVXHtnbmrjOM93PQPs9zvBNH0ll3ohEP1b0HewX-OK6ftojwIyNol3_YBPerdXxSJErywUxcz9qsX58owhLleCbitw_P8T4W984zxPJn58xt-zSkh2zb1B7JwUoS1ZyNgdm_OK-2Oa_9QS6c')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-dim/80 dark:from-neutral-900/80 to-transparent"></div>
+<div class="absolute bottom-2 left-2 flex items-center gap-1 bg-surface/90 dark:bg-neutral-800/90 backdrop-blur-sm px-2 py-1 rounded text-primary dark:text-inverse-primary">
+<span class="material-symbols-outlined text-[16px]">route</span>
+<span class="font-label-md text-label-md font-bold">Safe Route Available</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Buttons Grid -->
+<div class="grid grid-cols-3 gap-2 mt-2">
+<button class="flex flex-col items-center justify-center gap-2 bg-primary text-on-primary py-3 px-2 rounded-xl hover:bg-primary/90 active:scale-95 transition-all shadow-sm">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">navigation</span>
+<span class="font-label-md text-label-md">Navigate</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-2 bg-error text-on-error py-3 px-2 rounded-xl hover:bg-error/90 active:scale-95 transition-all shadow-sm">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">call</span>
+<span class="font-label-md text-label-md text-center">Call<br/>Emergency</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-2 bg-surface-container-high dark:bg-neutral-800 text-on-surface dark:text-neutral-200 border border-outline-variant/30 dark:border-neutral-700 py-3 px-2 rounded-xl hover:bg-surface-container dark:hover:bg-neutral-700 transition-all active:scale-95 shadow-sm">
+<span class="material-symbols-outlined">share_location</span>
+<span class="font-label-md text-label-md text-center">Share<br/>Location</span>
+</button>
+</div>
+<span class="font-mono-label text-mono-label text-outline dark:text-neutral-500 text-center mt-2">AIDRAC Confidence: 94%</span>
+</div>
+</main>
+<!-- Chat Input Area -->
+<div class="fixed bottom-[calc(80px+env(safe-area-inset-bottom,0px))] w-full px-4 py-3 bg-surface/80 dark:bg-neutral-900/80 backdrop-blur-xl border-t border-outline-variant/20 dark:border-neutral-800 z-40">
+<div class="flex items-center gap-2 bg-surface-container-low dark:bg-neutral-800 border border-outline-variant/50 dark:border-neutral-700 rounded-full px-4 py-2 shadow-inner focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+<button class="text-on-surface-variant dark:text-neutral-400 hover:text-primary dark:hover:text-inverse-primary transition-colors p-1">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+</button>
+<input class="flex-1 bg-transparent border-none focus:ring-0 text-on-surface dark:text-neutral-100 font-body-md text-body-md placeholder:text-outline dark:placeholder:text-neutral-500 p-0 h-8" placeholder="Ask AIDRAC..." type="text"/>
+<button class="text-primary dark:text-inverse-primary hover:text-primary-container transition-colors p-1 bg-primary/10 dark:bg-primary/20 rounded-full flex items-center justify-center h-8 w-8">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">mic</span>
+</button>
+</div>
+</div>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 rounded-t-xl bg-surface/90 dark:bg-neutral-900/90 backdrop-blur-xl border-t border-outline-variant/30 dark:border-neutral-800 shadow-lg flex justify-around items-center h-20 pb-safe px-2 hidden md:hidden flex">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-neutral-400 hover:text-primary dark:hover:text-inverse-primary active:scale-90 duration-200 w-16" href="#">
+<span class="material-symbols-outlined mb-1">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-neutral-400 hover:text-primary dark:hover:text-inverse-primary active:scale-90 duration-200 w-16" href="#">
+<span class="material-symbols-outlined mb-1">map</span>
+<span class="font-label-md text-label-md">Map</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary text-on-primary-container dark:text-on-primary rounded-full px-4 py-1.5 active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+<span class="font-label-md text-label-md">AI Assistant</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-neutral-400 hover:text-primary dark:hover:text-inverse-primary active:scale-90 duration-200 w-16 relative" href="#">
+<span class="material-symbols-outlined mb-1">notifications</span>
+<span class="font-label-md text-label-md">Alerts</span>
+<div class="absolute top-0 right-3 w-2 h-2 bg-error rounded-full border border-surface dark:border-neutral-900"></div>
+</a>
+</nav>
+</body></html>

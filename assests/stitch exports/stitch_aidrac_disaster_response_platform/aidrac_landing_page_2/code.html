@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIDRAC - Mobile Dashboard</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error-container": "#ffdad6",
+                        "background": "#faf8ff",
+                        "on-background": "#191b23",
+                        "primary-container": "#2563eb",
+                        "on-surface": "#191b23",
+                        "on-secondary-fixed": "#341100",
+                        "tertiary": "#943700",
+                        "secondary-container": "#fd761a",
+                        "secondary": "#9d4300",
+                        "outline": "#737686",
+                        "on-surface-variant": "#434655",
+                        "on-primary-fixed": "#00174b",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-fixed": "#360f00",
+                        "surface-variant": "#e1e2ed",
+                        "outline-variant": "#c3c6d7",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#d9d9e5",
+                        "tertiary-container": "#bc4800",
+                        "primary-fixed": "#dbe1ff",
+                        "surface-container-low": "#f3f3fe",
+                        "surface-container-high": "#e7e7f3",
+                        "secondary-fixed": "#ffdbca",
+                        "primary": "#004ac6",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "inverse-on-surface": "#f0f0fb",
+                        "secondary-fixed-dim": "#ffb690",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "inverse-primary": "#b4c5ff",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#faf8ff",
+                        "on-tertiary-container": "#ffede6",
+                        "on-secondary-fixed-variant": "#783200",
+                        "on-secondary": "#ffffff",
+                        "on-primary-container": "#eeefff",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "surface-container-highest": "#e1e2ed",
+                        "inverse-surface": "#2e3039",
+                        "tertiary-fixed": "#ffdbcd",
+                        "surface": "#faf8ff",
+                        "surface-container": "#ededf9",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-container": "#5c2400",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "surface-tint": "#0053db"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "24px",
+                        "stack-sm": "8px",
+                        "card-padding": "20px",
+                        "container-padding": "32px",
+                        "stack-lg": "24px",
+                        "unit": "4px",
+                        "stack-md": "16px"
+                    },
+                    "fontFamily": {
+                        "mono-label": ["JetBrains Mono", "monospace"],
+                        "headline-md": ["Geist", "sans-serif"],
+                        "headline-lg": ["Geist", "sans-serif"],
+                        "label-md": ["Geist", "sans-serif"],
+                        "headline-lg-mobile": ["Geist", "sans-serif"],
+                        "body-md": ["Geist", "sans-serif"],
+                        "display-lg": ["Geist", "sans-serif"],
+                        "body-lg": ["Geist", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "mono-label": ["11px", { "lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.04em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Custom animated map background feel */
+        .bg-map-pattern {
+            background-image: radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.05) 0%, transparent 60%), 
+                              linear-gradient(rgba(195, 198, 215, 0.1) 1px, transparent 1px), 
+                              linear-gradient(90deg, rgba(195, 198, 215, 0.1) 1px, transparent 1px);
+            background-size: 100% 100%, 24px 24px, 24px 24px;
+            background-position: center center, center center, center center;
+        }
+        
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(2.5); opacity: 0; }
+        }
+        
+        .radar-pulse {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: rgba(37, 99, 235, 0.2);
+            animation: pulse-ring 3s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+
+        /* PB-Safe polyfill for standard tailwind */
+        .pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface antialiased pt-16 pb-24 font-body-md selection:bg-primary-container selection:text-on-primary-container overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface-container-highest/80 backdrop-blur-xl border-b border-outline-variant/30 shadow-sm flex justify-between items-center px-4 h-16">
+<button class="active:scale-95 duration-200 p-2 -ml-2 rounded-full hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim" style="font-variation-settings: 'FILL' 1;">emergency</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary tracking-tight">AIDRAC</h1>
+<button class="active:scale-95 duration-200 p-2 -mr-2 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-primary">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">account_circle</span>
+</button>
+</header>
+<!-- Main Content -->
+<main class="w-full max-w-md mx-auto">
+<!-- Hero Section -->
+<section class="relative w-full px-4 pt-12 pb-16 overflow-hidden flex flex-col items-center text-center">
+<!-- Animated Map Background Element -->
+<div class="absolute inset-0 bg-map-pattern opacity-70 -z-10"></div>
+<div class="absolute top-1/4 right-1/4 -z-10">
+<div class="radar-pulse" style="animation-delay: 0s;"></div>
+<div class="radar-pulse" style="animation-delay: 1.5s;"></div>
+<div class="w-2 h-2 bg-primary rounded-full absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></div>
+</div>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-container/10 text-primary border border-primary/20 mb-6 shadow-sm">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-label-md text-label-md font-bold">SYSTEM ACTIVE</span>
+</span>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-4">
+                AI Disaster Response Coordinator
+            </h2>
+<p class="font-body-md text-body-md text-on-surface-variant mb-8 max-w-[280px]">
+                Real-time situational awareness and rapid decision support for high-stakes environments.
+            </p>
+<button class="w-full sm:w-auto bg-primary text-on-primary font-headline-md text-headline-md py-3 px-8 rounded-xl shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)] hover:bg-primary/90 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2">
+                Get Started
+                <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</section>
+<!-- Feature Grid -->
+<section class="px-4 pb-8 space-y-4">
+<!-- Feature 1: Monitoring -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-xl p-5 shadow-sm hover:shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)] transition-shadow">
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center shrink-0 text-primary">
+<span class="material-symbols-outlined">satellite_alt</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Disaster Monitoring</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Continuous ingestion of global sensor data, satellite imagery, and on-ground reports for predictive threat analysis.</p>
+</div>
+</div>
+</div>
+<!-- Feature 2: Evacuation -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-xl p-5 shadow-sm hover:shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)] transition-shadow">
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 rounded-lg bg-secondary-container/20 flex items-center justify-center shrink-0 text-secondary">
+<span class="material-symbols-outlined">route</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Evacuation Planning</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Dynamic routing algorithms that adapt to real-time road closures, structural integrity reports, and traffic density.</p>
+</div>
+</div>
+</div>
+<!-- Feature 3: Alerts -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-xl p-5 shadow-sm hover:shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)] transition-shadow">
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 rounded-lg bg-error-container/40 flex items-center justify-center shrink-0 text-error">
+<span class="material-symbols-outlined">notifications_active</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Emergency Alerts</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Targeted, multi-channel broadcast system ensuring critical information reaches affected populations instantly.</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 rounded-t-xl bg-surface/80 dark:bg-surface-container-highest/80 backdrop-blur-xl border-t border-outline-variant/30 shadow-lg flex justify-around items-center h-20 pb-safe px-2">
+<!-- Active: Dashboard -->
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1.5 min-w-[64px] active:scale-90 duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-md text-label-md mt-0.5">Dashboard</span>
+</button>
+<!-- Inactive: Map -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary active:scale-90 duration-200 min-w-[64px] py-1.5">
+<span class="material-symbols-outlined">map</span>
+<span class="font-label-md text-label-md mt-0.5">Map</span>
+</button>
+<!-- Inactive: AI Assistant -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary active:scale-90 duration-200 min-w-[64px] py-1.5">
+<span class="material-symbols-outlined">smart_toy</span>
+<span class="font-label-md text-label-md mt-0.5">AI Assistant</span>
+</button>
+<!-- Inactive: Alerts -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary active:scale-90 duration-200 min-w-[64px] py-1.5 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1.5 right-4 w-2 h-2 bg-error rounded-full"></span>
+<span class="font-label-md text-label-md mt-0.5">Alerts</span>
+</button>
+</nav>
+</body></html>
