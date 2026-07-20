@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -5,6 +6,12 @@ from app.config.settings import settings
 from app.database.connection import engine, Base, async_session_factory
 from app.routers import auth, users, shelters, hospitals, disasters, alerts, routes, weather, location, ai
 from app.services.disaster_sources.background_refresh import BackgroundIngestion
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 _background_ingestion = BackgroundIngestion(async_session_factory)
 

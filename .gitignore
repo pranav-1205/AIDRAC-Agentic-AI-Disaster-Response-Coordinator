@@ -28,5 +28,6 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
-#context
+# AI-generated documentation
+docs/
 backend/docs/

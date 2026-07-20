@@ -23,6 +23,8 @@ class AIService:
         context: str,
     ) -> AIRecommendationResponse:
         if not self._client:
+            print("[AIService] GEMINI_API_KEY is not set — returning degraded response")
+            logger.warning("[ai] GEMINI_API_KEY is missing; client was not initialized")
             return AIRecommendationResponse(
                 riskLevel="moderate",
                 summary="AI service is not configured. Set GEMINI_API_KEY to enable recommendations.",
@@ -63,7 +65,8 @@ Do not include explanations outside the JSON.
             return self._parse_response(response)
         except Exception as exc:
             reason = self._classify_error(exc)
-            logger.warning(f"[ai] Gemini API error (model={self._model}): {exc}")
+            print(f"[AIService] Gemini API error (model={self._model}): {exc}")
+            logger.exception(f"[ai] Gemini API error (model={self._model})")
 
             summary = "The AI service is temporarily unavailable."
             actions = [

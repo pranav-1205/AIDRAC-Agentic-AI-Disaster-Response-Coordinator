@@ -25,6 +25,8 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: "false"
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
     depends_on:
       postgres:
         condition: service_healthy

@@ -184,14 +184,14 @@ async def coordinator_node(state: AgentState) -> dict:
         )
 
         if _is_degraded(ai_response):
-            print("[Coordinator] AI unavailable")
+            print(f"[Coordinator] AI unavailable — reason: {ai_response.reason}")
             print("[Coordinator] Using deterministic fallback")
             rec = _deterministic_recommendation(state, source="fallback")
         else:
             print("[Coordinator] AI recommendation parsed")
             rec = _map_ai_response(ai_response)
-    except Exception:
-        print("[Coordinator] AI unavailable")
+    except Exception as exc:
+        print(f"[Coordinator] AI exception: {exc}")
         print("[Coordinator] Using deterministic fallback")
         rec = _deterministic_recommendation(state, source="fallback")
 
