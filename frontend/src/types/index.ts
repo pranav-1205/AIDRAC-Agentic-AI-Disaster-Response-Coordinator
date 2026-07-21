@@ -162,3 +162,21 @@ export interface AIRecommendationResponse {
   reason: string;
   actions: string[];
 }
+
+export interface RiskComponentBreakdown {
+  weather_score: number;
+  alert_score: number;
+  disaster_score: number;
+  infrastructure_score: number;
+}
+
+export interface RiskAssessmentResponse {
+  user_risk: string;
+  regional_alert_severity: string;
+  reason: string;
+  evacuation_required: boolean;
+  inside_alert_polygon: boolean;
+  nearby_alerts: number;
+  regional_alert_count: number;
+  components: RiskComponentBreakdown;
+}

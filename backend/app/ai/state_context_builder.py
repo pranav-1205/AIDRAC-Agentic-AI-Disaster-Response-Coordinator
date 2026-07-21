@@ -10,10 +10,14 @@ class StateContextBuilder:
     """Builds LLM context entirely from an AgentState (LangGraph path)."""
 
     @staticmethod
-    def build(state) -> str:
+    def build(state, assessment=None) -> str:
         rec = state.recommendation
 
         parts = []
+
+        if assessment is not None:
+            parts.append(StateContextBuilder._format_risk_assessment(assessment))
+            print(f"[Memory] Risk assessment injected: user_risk={assessment.user_risk}, regional_severity={assessment.regional_alert_severity}")
 
         if rec is not None and bool(rec.summary):
             parts.append(StateContextBuilder._format_previous_context(rec))
@@ -23,6 +27,27 @@ class StateContextBuilder:
 
         parts.append(StateContextBuilder._format_current_context(state))
         return "".join(parts)
+
+    @staticmethod
+    def _format_risk_assessment(assessment) -> str:
+        c = assessment.components
+        return (
+            "======================\n"
+            "SYSTEM RISK ASSESSMENT\n"
+            "======================\n"
+            f"Current User Risk: {assessment.user_risk}\n"
+            f"Regional Alert Severity: {assessment.regional_alert_severity}\n"
+            f"Evacuation Required: {'YES' if assessment.evacuation_required else 'NO'}\n"
+            f"Inside Alert Polygon: {'YES' if assessment.inside_alert_polygon else 'NO'}\n"
+            f"Nearby Alerts (affecting user): {assessment.nearby_alerts}\n"
+            f"Total Regional Alerts: {assessment.regional_alert_count}\n"
+            "Component Scores:\n"
+            f"  - Weather: {c.weather_score}\n"
+            f"  - Alerts affecting user: {c.alert_score}\n"
+            f"  - Disasters: {c.disaster_score}\n"
+            f"  - Infrastructure: {c.infrastructure_score}\n"
+            f"Assessment Reason: {assessment.reason}\n\n"
+        )
 
     # ------------------------------------------------------------------
     # Previous context

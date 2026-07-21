@@ -13,8 +13,8 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { useWeather } from '../hooks/useWeather';
 import { useSettings } from '../context/SettingsContext';
 import { sortByDistance, findNearest } from '../utils/haversine';
-import { alertApi, shelterApi, hospitalApi, disasterApi, locationApi } from '../services/api';
-import type { Alert, Shelter, Hospital, Disaster, NearbyResponse } from '../types';
+import { alertApi, shelterApi, hospitalApi, disasterApi, locationApi, riskApi } from '../services/api';
+import type { Alert, Shelter, Hospital, Disaster, NearbyResponse, RiskAssessmentResponse } from '../types';
 import MaterialIcon from '../components/ui/MaterialIcon';
 
 const SEVERITY_RANK: Record<string, number> = {
@@ -61,6 +61,11 @@ export default function Dashboard() {
   const { data: nearby } = useApi<NearbyResponse>(
     () => position ? locationApi.nearby(position.lat, position.lng, radiusMeters) : Promise.reject('no gps'),
     [position?.lat, position?.lng, radiusMeters]
+  );
+
+  const { data: riskData } = useApi<RiskAssessmentResponse>(
+    () => position ? riskApi.get(position.lat, position.lng) : Promise.reject('no gps'),
+    [position?.lat, position?.lng]
   );
 
   const sortedAlerts = useMemo(() => {
@@ -124,17 +129,29 @@ export default function Dashboard() {
     return null;
   }, [position, nearby]);
 
-  const statusInfo = useMemo(() => {
-    const nearbySrc = nearbyDisasters.length ? nearbyDisasters[0] : null;
-    const nearbyD = nearbySrc?.item;
-    if (position && nearbyD) {
-      const s = nearbyD.severity as string;
-      if (s === 'critical' || s === 'severe') return { label: 'HIGH RISK', color: 'text-red-400', dot: 'bg-red-500', bg: 'bg-red-500/10 border-red-500/20' };
-      if (s === 'high') return { label: 'ELEVATED', color: 'text-orange-400', dot: 'bg-orange-500', bg: 'bg-orange-500/10 border-orange-500/20' };
-      return { label: 'MODERATE', color: 'text-yellow-400', dot: 'bg-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20' };
+  const riskDisplay = useMemo(() => {
+    const rl = riskData?.user_risk;
+    if (!rl) {
+      const nearbySrc = nearbyDisasters.length ? nearbyDisasters[0] : null;
+      const nearbyD = nearbySrc?.item;
+      if (position && nearbyD) {
+        const s = nearbyD.severity as string;
+        if (s === 'critical' || s === 'severe') return { label: 'HIGH RISK', color: 'text-red-400', dot: 'bg-red-500', bg: 'bg-red-500/10 border-red-500/20', threats: nearbyDisasters.length };
+        if (s === 'high') return { label: 'ELEVATED', color: 'text-orange-400', dot: 'bg-orange-500', bg: 'bg-orange-500/10 border-orange-500/20', threats: nearbyDisasters.length };
+        return { label: 'MODERATE', color: 'text-yellow-400', dot: 'bg-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20', threats: nearbyDisasters.length };
+      }
+      return { label: 'SAFE', color: 'text-green-400', dot: 'bg-green-500', bg: 'bg-green-500/10 border-green-500/20', threats: 0 };
     }
-    return { label: 'SAFE', color: 'text-green-400', dot: 'bg-green-500', bg: 'bg-green-500/10 border-green-500/20' };
-  }, [position, nearbyDisasters]);
+    const map: Record<string, { label: string; color: string; dot: string; bg: string }> = {
+      SAFE:     { label: 'SAFE',     color: 'text-green-400', dot: 'bg-green-500', bg: 'bg-green-500/10 border-green-500/20' },
+      LOW:      { label: 'LOW',      color: 'text-lime-400',  dot: 'bg-lime-500',  bg: 'bg-lime-500/10 border-lime-500/20' },
+      MODERATE: { label: 'MODERATE', color: 'text-yellow-400', dot: 'bg-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20' },
+      HIGH:     { label: 'HIGH',     color: 'text-orange-400', dot: 'bg-orange-500', bg: 'bg-orange-500/10 border-orange-500/20' },
+      EXTREME:  { label: 'EXTREME',  color: 'text-red-400',   dot: 'bg-red-500',   bg: 'bg-red-500/10 border-red-500/20' },
+    };
+    const d = map[rl] || { label: rl, color: 'text-slate-400', dot: 'bg-slate-500', bg: 'bg-slate-500/10 border-slate-500/20' };
+    return { ...d, threats: riskData.nearby_alerts };
+  }, [riskData, position, nearbyDisasters]);
 
   const handleCopy = useCallback(async (text: string, index: number) => {
     try {
@@ -153,10 +170,10 @@ export default function Dashboard() {
       <h1 className="text-3xl font-bold font-display text-white tracking-tight">Dashboard</h1>
 
       {/* ===== 1. Status Strip ===== */}
-      <div className={`flex items-center gap-4 px-5 py-3.5 rounded-xl border ${statusInfo.bg}`}>
-        <span className={`w-2.5 h-2.5 rounded-full ${statusInfo.dot} animate-pulse shrink-0`} />
-        <span className={`text-sm font-bold font-mono uppercase tracking-widest ${statusInfo.color}`}>
-          {statusInfo.label}
+      <div className={`flex items-center gap-4 px-5 py-3.5 rounded-xl border ${riskDisplay.bg}`}>
+        <span className={`w-2.5 h-2.5 rounded-full ${riskDisplay.dot} animate-pulse shrink-0`} />
+        <span className={`text-sm font-bold font-mono uppercase tracking-widest ${riskDisplay.color}`}>
+          {riskDisplay.label}
         </span>
         <span className="hidden sm:inline text-sm text-slate-400">·</span>
         <span className="hidden sm:flex items-center gap-1.5 text-sm text-slate-400">
@@ -165,10 +182,23 @@ export default function Dashboard() {
         </span>
         <span className="hidden md:inline text-sm text-slate-500">·</span>
         <span className="hidden md:flex items-center gap-1.5 text-sm text-slate-500">
-          {nearbyDisasters.length > 0
-            ? `${nearbyDisasters.length} nearby threat${nearbyDisasters.length !== 1 ? 's' : ''}`
-            : 'No nearby threats'}
+          {riskData
+            ? riskData.nearby_alerts > 0
+              ? `${riskData.nearby_alerts} nearby threat${riskData.nearby_alerts !== 1 ? 's' : ''}`
+              : 'No nearby threats'
+            : nearbyDisasters.length > 0
+              ? `${nearbyDisasters.length} nearby threat${nearbyDisasters.length !== 1 ? 's' : ''}`
+              : 'No nearby threats'}
         </span>
+        {riskData && riskData.regional_alert_severity !== 'NONE' && (
+          <>
+            <span className="hidden lg:inline text-sm text-slate-600">·</span>
+            <span className="hidden lg:flex items-center gap-1.5 text-sm">
+              <span className={`w-2 h-2 rounded-full ${riskData.regional_alert_severity === 'CRITICAL' || riskData.regional_alert_severity === 'SEVERE' ? 'bg-red-500' : riskData.regional_alert_severity === 'HIGH' ? 'bg-orange-500' : 'bg-yellow-500'}`} />
+              Regional: {riskData.regional_alert_severity}
+            </span>
+          </>
+        )}
         <span className="hidden lg:inline text-sm text-slate-600">·</span>
         <span className="hidden lg:flex items-center gap-1.5 text-sm text-slate-600">
           <span className={`w-2 h-2 rounded-full ${position ? 'bg-green-500' : 'bg-slate-600'}`} />

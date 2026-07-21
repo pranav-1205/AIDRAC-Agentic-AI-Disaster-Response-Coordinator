@@ -84,6 +84,11 @@ export const aiApi = {
     api.post('/ai/recommendation', data),
 };
 
+export const riskApi = {
+  get: (lat: number, lng: number) =>
+    api.get('/risk', { params: { lat, lng } }),
+};
+
 export const routingApi = {
   ors: (start: [number, number], end: [number, number], apiKey: string) => {
     const body = {

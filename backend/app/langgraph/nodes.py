@@ -17,6 +17,7 @@ from app.services.weather import WeatherService
 from app.services.alert import AlertService
 from app.services.location_service import LocationService
 from app.services.routing_service import RoutingService
+from app.services.risk_assessment_service import RiskAssessmentService
 from app.database.connection import async_session_factory
 from app.ai.ai_service import AIService
 from app.ai.schemas import AIRecommendationResponse
@@ -26,6 +27,7 @@ _weather_service = WeatherService()
 _location_service = LocationService()
 _ai_service = AIService(api_key=settings.GEMINI_API_KEY)
 _routing_service = RoutingService()
+_risk_service = RiskAssessmentService()
 
 SEVERITY_RANK = {"critical": 0, "severe": 1, "high": 2, "warning": 3, "advisory": 4, "info": 5}
 
@@ -174,7 +176,29 @@ async def coordinator_node(state: AgentState) -> dict:
     print("[LangGraph] Coordinator started")
     print("[Coordinator] Building LLM context")
 
-    context = StateContextBuilder.build(state)
+    lat = state.location.latitude if state.location else 0.0
+    lng = state.location.longitude if state.location else 0.0
+
+    weather_dict = None
+    if state.weather and state.weather.temperature is not None:
+        weather_dict = {
+            "temperature": state.weather.temperature,
+            "description": state.weather.description or "",
+        }
+
+    alerts_raw = state.alerts.alerts if state.alerts else []
+
+    print("[Coordinator] Running risk assessment")
+    assessment = _risk_service.evaluate(
+        lat=lat,
+        lng=lng,
+        weather=weather_dict,
+        alerts=alerts_raw,
+        infrastructure=state.infrastructure,
+    )
+    print(f"[Coordinator] User risk: {assessment.user_risk} | Regional alert: {assessment.regional_alert_severity}")
+
+    context = StateContextBuilder.build(state, assessment)
 
     try:
         print("[Coordinator] Calling AIService")
@@ -186,14 +210,14 @@ async def coordinator_node(state: AgentState) -> dict:
         if _is_degraded(ai_response):
             print(f"[Coordinator] AI unavailable — reason: {ai_response.reason}")
             print("[Coordinator] Using deterministic fallback")
-            rec = _deterministic_recommendation(state, source="fallback")
+            rec = _deterministic_recommendation(state, assessment, source="fallback")
         else:
             print("[Coordinator] AI recommendation parsed")
-            rec = _map_ai_response(ai_response)
+            rec = _map_ai_response(ai_response, assessment)
     except Exception as exc:
         print(f"[Coordinator] AI exception: {exc}")
         print("[Coordinator] Using deterministic fallback")
-        rec = _deterministic_recommendation(state, source="fallback")
+        rec = _deterministic_recommendation(state, assessment, source="fallback")
 
     return {"recommendation": rec}
 
@@ -209,7 +233,9 @@ def _is_degraded(response: AIRecommendationResponse) -> bool:
     return any(k in s or k in r for k in _DEGRADED_INDICATORS)
 
 
-def _map_ai_response(response: AIRecommendationResponse) -> RecommendationState:
+def _map_ai_response(
+    response: AIRecommendationResponse, assessment
+) -> RecommendationState:
     dest_name = None
     if response.recommendedDestination:
         dest_name = (
@@ -218,17 +244,17 @@ def _map_ai_response(response: AIRecommendationResponse) -> RecommendationState:
         )
 
     return RecommendationState(
-        summary=response.summary,
+        summary=response.summary or assessment.reason,
         actions=response.actions,
-        risk_level=response.riskLevel,
-        reasoning=response.reason,
+        risk_level=assessment.user_risk.lower(),
+        reasoning=response.reason or assessment.reason,
         recommended_destination=dest_name,
         source="gemini",
     )
 
 
 def _deterministic_recommendation(
-    state: AgentState, source: str = "fallback"
+    state: AgentState, assessment, source: str = "fallback"
 ) -> RecommendationState:
     weather_status = (
         "available"
@@ -247,14 +273,7 @@ def _deterministic_recommendation(
         "Please follow local authority guidance."
     )
 
-    risk = (
-        state.weather.risk_level
-        if state.weather and state.weather.risk_level
-        else "unknown"
-    )
-    if state.alerts and state.alerts.highest_severity in ("critical", "severe"):
-        risk = "high"
-
+    risk = assessment.user_risk.lower()
     dest_name = None
     if state.destination and state.destination.destination:
         dest_name = (
@@ -266,7 +285,7 @@ def _deterministic_recommendation(
         summary=summary,
         actions=_suggest_actions(state),
         risk_level=risk,
-        reasoning="AI service unavailable; recommendation based on available agent data.",
+        reasoning=assessment.reason,
         recommended_destination=dest_name,
         source=source,
     )

@@ -11,17 +11,19 @@ import Badge from './ui/Badge';
 import LoadingSpinner from './ui/LoadingSpinner';
 
 const RISK_VARIANTS: Record<string, 'danger' | 'warning' | 'info' | 'default'> = {
-  low: 'default',
-  moderate: 'info',
-  high: 'warning',
-  critical: 'danger',
+  safe: 'default',
+  low: 'info',
+  moderate: 'warning',
+  high: 'danger',
+  extreme: 'danger',
 };
 
 const RISK_LABELS: Record<string, string> = {
+  safe: 'Safe',
   low: 'Low',
   moderate: 'Moderate',
   high: 'High',
-  critical: 'Critical',
+  extreme: 'Extreme',
 };
 
 const DEST_ICONS: Record<string, React.ReactNode> = {

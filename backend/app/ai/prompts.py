@@ -88,12 +88,26 @@ If emergency assistance is required and no contact number exists in the supplied
 RISK LEVEL
 ==================================================
 
-Determine exactly one:
+The system has already determined TWO separate values:
 
-LOW
-MODERATE
-HIGH
-CRITICAL
+1. Current User Risk — How dangerous the situation is for the user at their exact location. This considers polygons, distance, local weather, and evacuation orders.
+
+2. Regional Alert Severity — The highest severity among ALL active alerts in the region.
+
+These can differ. For example, critical regional alerts may exist in nearby districts without affecting the user's location.
+
+Your job is to EXPLAIN both values and why they may differ.
+
+Do NOT change, downgrade, or upgrade the Current User Risk.
+
+Output the SAME Current User Risk in the JSON response as riskLevel.
+
+The risk scale is:
+SAFE — No threats detected
+LOW — Minor weather or distant regional alerts
+MODERATE — Active nearby alerts or significant local weather
+HIGH — Severe nearby alerts or dangerous local weather
+EXTREME — Evacuation order or life-threatening conditions at user location
 
 ==================================================
 DESTINATION SELECTION
@@ -170,7 +184,7 @@ OUTPUT FORMAT
 Return ONLY valid JSON.
 
 {
-  "riskLevel":"LOW|MODERATE|HIGH|CRITICAL",
+  "riskLevel":"SAFE|LOW|MODERATE|HIGH|EXTREME (must match Current User Risk from system assessment above)",
 
   "summary":"...",
 

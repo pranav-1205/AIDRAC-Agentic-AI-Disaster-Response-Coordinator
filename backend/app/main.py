@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config.settings import settings
 from app.database.connection import engine, Base, async_session_factory
-from app.routers import auth, users, shelters, hospitals, disasters, alerts, routes, weather, location, ai
+from app.routers import auth, users, shelters, hospitals, disasters, alerts, routes, weather, location, ai, risk as risk_router
 from app.services.disaster_sources.background_refresh import BackgroundIngestion
 
 logging.basicConfig(
@@ -53,6 +53,7 @@ app.include_router(routes.router)
 app.include_router(weather.router)
 app.include_router(location.router)
 app.include_router(ai.router)
+app.include_router(risk_router.router)
 
 
 @app.get("/api/health")
