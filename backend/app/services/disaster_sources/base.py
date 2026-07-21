@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+import re
 from typing import Any
 
 
@@ -27,10 +28,22 @@ class AlertData:
     urgency: str
     certainty: str
     area: str
+    # The RSS publication time (or CAP <sent> as a fallback), not the time our
+    # ingestion job happened to retrieve the alert.
+    published_at: str | None = None
     effective: str | None = None
     expires: str | None = None
     polygons: list[str] | None = None
     source: str = "cap"
+
+
+_NDMA_IDENTIFIER_TARGET_SUFFIX = re.compile(r"^(IN-\d+)_\d+$")
+
+
+def canonical_alert_id(external_id: str) -> str:
+    """Return the stable identifier for CAP alerts duplicated by NDMA targets."""
+    match = _NDMA_IDENTIFIER_TARGET_SUFFIX.fullmatch(external_id.strip())
+    return match.group(1) if match else external_id.strip()
 
 
 class WeatherProvider(ABC):

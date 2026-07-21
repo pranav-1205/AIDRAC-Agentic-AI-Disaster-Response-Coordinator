@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.alert import Alert
 from app.services.disaster_sources.cap_provider import CapProvider
 from app.services.disaster_sources.normalizer import alert_data_to_dict
+from app.services.disaster_sources.base import canonical_alert_id
 
 logger = logging.getLogger("aidrac.disaster_sources.ingestion_service")
 
@@ -39,7 +40,8 @@ class IngestionService:
 
         for alert_data in cap_alerts:
             fields = alert_data_to_dict(alert_data)
-            row = existing.get(alert_data.external_id)
+            dedup_key = canonical_alert_id(alert_data.external_id)
+            row = existing.get(dedup_key)
 
             if row is not None:
                 for key, value in fields.items():
@@ -51,6 +53,7 @@ class IngestionService:
             else:
                 row = Alert(**fields)
                 db.add(row)
+                existing[dedup_key] = row
                 inserted += 1
 
             ingested.append(row)
@@ -73,7 +76,11 @@ class IngestionService:
             select(Alert).where(Alert.external_id.isnot(None))
         )
         rows = result.scalars().all()
-        return {r.external_id: r for r in rows if r.external_id}
+        return {
+            canonical_alert_id(r.external_id): r
+            for r in rows
+            if r.external_id
+        }
 
     async def _soft_expire(self, db: AsyncSession) -> int:
         now = datetime.now(timezone.utc)

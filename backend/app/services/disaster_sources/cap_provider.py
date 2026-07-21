@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 from typing import Any
 import httpx
 from app.config.settings import settings
-from app.services.disaster_sources.base import AlertProvider, AlertData
+from app.services.disaster_sources.base import AlertProvider, AlertData, canonical_alert_id
 from app.services.disaster_sources.cache import CacheService
 
 logger = logging.getLogger("aidrac.disaster_sources.cap_provider")
@@ -67,8 +67,9 @@ class CapProvider(AlertProvider):
         for r in results:
             if isinstance(r, list):
                 for alert in r:
-                    if alert.external_id not in seen:
-                        seen.add(alert.external_id)
+                    dedup_key = canonical_alert_id(alert.external_id)
+                    if dedup_key not in seen:
+                        seen.add(dedup_key)
                         merged.append(alert)
 
         logger.info("[CAP] Merged %d unique alerts from %d sources", len(merged), len(self._sources))
@@ -108,11 +109,13 @@ class CapProvider(AlertProvider):
         if not items:
             return []
 
-        cap_urls = []
+        cap_urls: list[tuple[str, str | None]] = []
         for i, item in enumerate(items):
             cap_url = self._extract_cap_url(item)
             if cap_url:
-                cap_urls.append(cap_url)
+                # pubDate is the time the NDMA RSS feed published this alert.
+                # Keep it paired with its CAP document throughout ingestion.
+                cap_urls.append((cap_url, item.get("pubDate") or item.get("date")))
             else:
                 logger.warning("[CAP] %s item %d has no CAP XML URL (keys: %s)", label, i, list(item.keys()))
 
@@ -135,18 +138,22 @@ class CapProvider(AlertProvider):
                 logger.info("[CAP] %s initial delay of %.1fs before CAP XML fetches", label, INITIAL_DELAY)
                 await asyncio.sleep(INITIAL_DELAY)
 
-            rate_limited_urls: list[str] = []
-            for idx, xml_url in enumerate(urls_to_fetch):
+            rate_limited_urls: list[tuple[str, str | None]] = []
+            for idx, (xml_url, published_at) in enumerate(urls_to_fetch):
                 if idx > 0:
                     await asyncio.sleep(DELAY_BETWEEN_XML)
-                alert, was_limited = await self._fetch_cap_xml(xml_url, label)
+                alert, was_limited = await self._fetch_cap_xml(xml_url, label, published_at)
                 if alert is not None:
                     alerts.append(alert)
                 elif was_limited:
-                    rate_limited_urls.append(xml_url)
+                    rate_limited_urls.append((xml_url, published_at))
 
             if rate_limited_urls and batch_attempt < max_batch_retries:
-                urls_to_fetch = [u for u in rate_limited_urls if self._cache.get(f"cap:{u}") is None]
+                urls_to_fetch = [
+                    (url, published_at)
+                    for url, published_at in rate_limited_urls
+                    if self._cache.get(f"cap:{url}") is None
+                ]
                 if urls_to_fetch:
                     batch_attempt += 1
                     logger.info("[CAP] %s %d URLs rate-limited, will retry batch after cooldown", label, len(urls_to_fetch))
@@ -185,11 +192,16 @@ class CapProvider(AlertProvider):
             items.append(item)
         return items
 
-    async def _fetch_cap_xml(self, url: str, label: str) -> tuple[AlertData | None, bool]:
+    async def _fetch_cap_xml(
+        self, url: str, label: str, published_at: str | None = None
+    ) -> tuple[AlertData | None, bool]:
         cache_key = f"cap:{url}"
         cached = self._cache.get(cache_key)
         if cached is not None:
             logger.debug("CAP XML cache hit for %s", url)
+            # Older cached values may predate the RSS timestamp field.
+            if published_at and not cached.published_at:
+                cached.published_at = published_at
             return cached, False
 
         headers = {
@@ -216,7 +228,7 @@ class CapProvider(AlertProvider):
                                 logger.warning("CAP XML %s for %s returned 302 to %s — rate limited, giving up after %d retries", url, label, location, MAX_RETRIES)
                                 return None, True
                         resp.raise_for_status()
-                        alert = self._parse_single_alert(resp.content, label)
+                        alert = self._parse_single_alert(resp.content, label, published_at)
                         if alert is not None:
                             self._cache.set(cache_key, alert, ttl=settings.CACHE_TTL_SECONDS)
                         return alert, False
@@ -236,7 +248,9 @@ class CapProvider(AlertProvider):
             return None, True
 
     @staticmethod
-    def _parse_single_alert(raw_xml: bytes, label: str = "unknown") -> AlertData | None:
+    def _parse_single_alert(
+        raw_xml: bytes, label: str = "unknown", published_at: str | None = None
+    ) -> AlertData | None:
         try:
             root = ET.fromstring(raw_xml)
         except ET.ParseError as exc:
@@ -249,6 +263,10 @@ class CapProvider(AlertProvider):
         if not identifier:
             logger.warning("CAP XML missing identifier for %s — skipping", label)
             return None
+
+        # RSS <pubDate> represents the website publication time. CAP <sent>
+        # is a reliable fallback for feeds that omit it.
+        published_at = published_at or CapProvider._cap_text(root, ns, "sent")
 
         info = root.find(f"{{{ns}}}info")
         if info is None:
@@ -289,6 +307,7 @@ class CapProvider(AlertProvider):
             urgency=urgency,
             certainty=certainty,
             area=area_str,
+            published_at=published_at,
             effective=effective,
             expires=expires,
             polygons=polygons if polygons else None,
