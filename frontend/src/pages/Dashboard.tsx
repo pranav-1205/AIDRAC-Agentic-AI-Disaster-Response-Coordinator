@@ -159,6 +159,13 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [showResponderPanel]);
 
+  const sortedAlerts = useMemo(() => {
+    if (!alerts) return [];
+    return [...alerts]
+      .filter((a) => meetsMinSeverity(a.severity, settings.min_alert_severity))
+      .sort((a, b) => (SEVERITY_RANK[a.severity] ?? 6) - (SEVERITY_RANK[b.severity] ?? 6));
+  }, [alerts, settings.min_alert_severity]);
+
   // Notification wiring for nearby SOS and alerts
   useEffect(() => {
     if (!settings.notifications_enabled || !settings.push_notifications || !('Notification' in window)) return;
@@ -190,13 +197,6 @@ export default function Dashboard() {
       }
     }
   }, [nearbySOS, sortedAlerts, settings.notifications_enabled, settings.push_notifications, lastNotifiedSOS, lastNotifiedAlert]);
-
-  const sortedAlerts = useMemo(() => {
-    if (!alerts) return [];
-    return [...alerts]
-      .filter((a) => meetsMinSeverity(a.severity, settings.min_alert_severity))
-      .sort((a, b) => (SEVERITY_RANK[a.severity] ?? 6) - (SEVERITY_RANK[b.severity] ?? 6));
-  }, [alerts, settings.min_alert_severity]);
 
   const activeDisasters = useMemo(() => {
     if (!disasters) return [];

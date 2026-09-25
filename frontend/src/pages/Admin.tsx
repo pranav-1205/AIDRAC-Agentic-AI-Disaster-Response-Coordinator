@@ -11,7 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { adminApi, shelterApi, hospitalApi, disasterApi, alertApi, sosApi, locationApi } from '../services/api';
-import { Shelter, Hospital, Disaster, Alert, SOSAdminListResponse, SOSStatus, SOSResponderType, AdminOverviewResponse, AdminZoneStatsResponse, AdminResponderResponse, AdminIncidentHistoryResponse, AdminAlertResponse } from '../types';
+import { Shelter, Hospital, Disaster, Alert, SOSStatus, SOSResponderType, AdminOverviewResponse, AdminZoneStatsResponse, AdminResponderResponse, AdminIncidentHistoryResponse, AdminAlertResponse, AdminUserResponse, AdminSOSResponse } from '../types';
 import { AlertTriangle, Navigation, UserCheck, Shield, MapPin, Clock, User, Users, Activity, CheckCircle, XCircle, Map, Target, RefreshCw, MoreVertical } from 'lucide-react';
 
 const STATUS_COLORS: Record<SOSStatus, string> = {
@@ -47,7 +47,7 @@ const RESPONDER_TYPE_LABELS: Record<SOSResponderType, string> = {
   official: 'Official Responder',
 };
 
-const STATUS_GROUPS: { key: SOSStatus; label: string; statuses: SOSStatus[] }[] = [
+const STATUS_GROUPS: { key: string; label: string; statuses: SOSStatus[] }[] = [
   { key: 'active', label: 'NEW', statuses: ['active', 'received'] },
   { key: 'acknowledged', label: 'ACKNOWLEDGED', statuses: ['acknowledged'] },
   { key: 'assigned', label: 'ASSIGNED', statuses: ['awaiting_responder', 'responder_assigned'] },
@@ -67,7 +67,7 @@ function AlertSeverityColor(severity: string): string {
   }
 }
 
-function AlertSeverityBadge(severity: string) {
+function AlertSeverityBadge({ severity }: { severity: string }) {
   return (
     <Badge variant="info" className="text-xs" style={{ backgroundColor: `${AlertSeverityColor(severity)}20`, borderColor: `${AlertSeverityColor(severity)}40`, color: AlertSeverityColor(severity) }}>
       {severity.toUpperCase()}
@@ -77,7 +77,7 @@ function AlertSeverityBadge(severity: string) {
 
 function AdminMap({ alerts, sosIncidents, responders, users, activeDisasters, position, settings }: {
   alerts: Alert[];
-  sosIncidents: SOSAdminListResponse[];
+  sosIncidents: AdminSOSResponse[];
   responders: AdminResponderResponse[];
   users: AdminUserResponse[];
   activeDisasters: Disaster[];
@@ -109,8 +109,8 @@ function AdminMap({ alerts, sosIncidents, responders, users, activeDisasters, po
 function SOSStatusGroup({ statuses, label, incidents, onAction }: {
   statuses: SOSStatus[];
   label: string;
-  incidents: SOSAdminListResponse[];
-  onAction: (sos: SOSAdminListResponse, action: string) => void;
+  incidents: AdminSOSResponse[];
+  onAction: (sos: AdminSOSResponse, action: string) => void;
 }) {
   const filtered = incidents.filter(s => statuses.includes(s.status));
   
@@ -358,7 +358,7 @@ export default function Admin() {
     [disasters]
   );
 
-  const handleSOSAction = useCallback(async (sos: SOSAdminListResponse, action: string) => {
+  const handleSOSAction = useCallback(async (sos: AdminSOSResponse, action: string) => {
     try {
       switch (action) {
         case 'acknowledge':

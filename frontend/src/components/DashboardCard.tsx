@@ -6,7 +6,7 @@ interface DashboardCardProps {
   value: string | number;
   icon: ReactNode;
   subtitle?: string;
-  color?: 'blue' | 'orange' | 'red' | 'green';
+  color?: 'blue' | 'orange' | 'red' | 'green' | 'amber' | 'purple' | 'cyan';
 }
 
 const colorMap = {
@@ -14,6 +14,9 @@ const colorMap = {
   orange: 'text-warning-400 bg-warning-500/10 border-warning-500/20',
   red: 'text-danger-400 bg-danger-500/10 border-danger-500/20',
   green: 'text-success-400 bg-success-500/10 border-success-500/20',
+  amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  purple: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
+  cyan: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
 };
 
 const pulseMap = {
@@ -21,6 +24,9 @@ const pulseMap = {
   orange: 'bg-warning-500',
   red: 'bg-danger-500',
   green: 'bg-success-500',
+  amber: 'bg-amber-500',
+  purple: 'bg-purple-500',
+  cyan: 'bg-cyan-500',
 };
 
 export default function DashboardCard({ title, value, icon, subtitle, color = 'blue' }: DashboardCardProps) {

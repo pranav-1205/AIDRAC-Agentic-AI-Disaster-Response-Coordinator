@@ -18,7 +18,7 @@ from app.models.user import User, UserRole
 from app.utils.security import hash_password
 
 
-ADMIN_EMAIL = "admin@aidrac.local"
+ADMIN_EMAIL = "admin@aidrac.com"
 ADMIN_NAME = "AIDRAC System Administrator"
 ADMIN_PASSWORD = "AIDRAC-Admin@2026!"
 

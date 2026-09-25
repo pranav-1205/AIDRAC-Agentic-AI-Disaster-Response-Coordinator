@@ -1,10 +1,11 @@
-import { type ReactNode } from 'react';
+import { type CSSProperties, type ReactNode } from 'react';
 
 interface BadgeProps {
   variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info';
-  size?: 'sm' | 'md';
+  size?: 'xs' | 'sm' | 'md';
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
 }
 
 const variantStyles = {
@@ -17,13 +18,14 @@ const variantStyles = {
 };
 
 const sizeStyles = {
+  xs: 'px-1.5 py-0.5 text-[10px] tracking-wider uppercase font-mono',
   sm: 'px-2 py-0.5 text-xs tracking-wider uppercase font-mono',
   md: 'px-2.5 py-1 text-xs tracking-wide uppercase font-mono',
 };
 
-export default function Badge({ variant = 'default', size = 'sm', children, className = '' }: BadgeProps) {
+export default function Badge({ variant = 'default', size = 'sm', children, className = '', style }: BadgeProps) {
   return (
-    <span className={`inline-flex items-center justify-center gap-1 rounded-md font-medium ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}>
+    <span style={style} className={`inline-flex items-center justify-center gap-1 rounded-md font-medium ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}>
       {children}
     </span>
   );

@@ -29,5 +29,12 @@ class Alert(Base):
     longitude = Column(Float, nullable=True)
     accuracy = Column(Float, nullable=True)
     timestamp = Column(BigInteger, nullable=True)
+    location_source = Column(String(30), nullable=True)
 
     disaster = relationship("Disaster", backref="alerts")
+    locations = relationship(
+        "AlertLocation",
+        back_populates="alert",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

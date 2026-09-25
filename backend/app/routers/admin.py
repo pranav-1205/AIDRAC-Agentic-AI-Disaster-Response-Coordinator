@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, and_
+from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 
@@ -134,7 +135,11 @@ async def get_admin_alerts(
     current_user: User = Depends(require_admin),
 ):
     now = datetime.now(timezone.utc)
-    query = select(Alert).order_by(Alert.created_at.desc())
+    query = (
+        select(Alert)
+        .options(selectinload(Alert.locations))
+        .order_by(Alert.created_at.desc())
+    )
 
     if active_only:
         query = query.where(
