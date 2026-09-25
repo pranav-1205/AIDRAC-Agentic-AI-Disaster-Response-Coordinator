@@ -14,12 +14,15 @@ import EmptyState from '../components/ui/EmptyState';
 import LocationStatus from '../components/LocationStatus';
 import { useProgressiveList } from '../hooks/useProgressiveList';
 
-function isPositionFresh(position: GeoPosition | null, staleThresholdMs = 30000): boolean {
+function isPositionFresh(position: GeoPosition | null, staleThresholdMs = 300000): boolean {
   if (!position) return false;
   return Date.now() - position.timestamp < staleThresholdMs;
 }
 
-function isPositionAccurate(position: GeoPosition | null, maxAccuracyMeters = 100): boolean {
+// Network/Wi-Fi fixes on desktops routinely report accuracies in the hundreds
+// of metres, so a 100 m ceiling rejected perfectly usable positions and made
+// the page claim GPS was disabled.
+function isPositionAccurate(position: GeoPosition | null, maxAccuracyMeters = 1000): boolean {
   if (!position) return false;
   return position.accuracy <= maxAccuracyMeters;
 }
@@ -28,8 +31,11 @@ export default function Hospitals() {
   const { settings } = useSettings();
   const geo = useGeolocation({ watch: false });
   const browserPosition = geo.position;
-  const hasFreshPosition = isPositionFresh(browserPosition) && isPositionAccurate(browserPosition);
-  const position = hasFreshPosition ? browserPosition : null;
+  // A coarse fix still resolves hospitals within the search radius, so it is
+  // used rather than discarded. Quality is reported as a notice instead of
+  // replacing the results with a false "Enable GPS" screen.
+  const position = browserPosition;
+  const coarsePosition = browserPosition !== null && !isPositionAccurate(browserPosition);
   const navigate = useNavigate();
 
   const radiusMeters = settings.emergency_radius * 1000;
@@ -59,6 +65,19 @@ export default function Hospitals() {
       <LocationStatus geolocation={geo} showDetails={true} />
     </div>
   );
+
+  const renderAccuracyNotice = () => {
+    if (!coarsePosition || !browserPosition) return null;
+    return (
+      <div className="flex items-start gap-2 rounded-lg border border-warning-500/20 bg-warning-500/10 px-3 py-2 text-xs text-warning-300">
+        <MaterialIcon icon="gps_not_fixed" className="text-base shrink-0" />
+        <span>
+          Approximate location (±{Math.round(browserPosition.accuracy)}m). Results are for the area around
+          this point rather than your exact spot.
+        </span>
+      </div>
+    );
+  };
 
   // -------------------------
   // ALL HOOKS - before any conditional return
@@ -119,6 +138,7 @@ export default function Hospitals() {
   return (
     <div className="space-y-6">
       {renderHeader()}
+      {renderAccuracyNotice()}
 
       {/* Result counter */}
       <div className="flex items-center justify-between mb-4">

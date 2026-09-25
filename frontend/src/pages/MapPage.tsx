@@ -264,7 +264,10 @@ function isPositionFresh(position: GeoPosition | null, staleThresholdMs = 30000)
   return Date.now() - position.timestamp < staleThresholdMs;
 }
 
-function isPositionAccurate(position: GeoPosition | null, maxAccuracyMeters = 100): boolean {
+// Network/Wi-Fi fixes on desktops routinely report accuracies in the hundreds
+// of metres, so a 100 m ceiling rejected real positions and left the map
+// uncentred with GPS switched on.
+function isPositionAccurate(position: GeoPosition | null, maxAccuracyMeters = 1000): boolean {
   if (!position) return false;
   return position.accuracy <= maxAccuracyMeters;
 }

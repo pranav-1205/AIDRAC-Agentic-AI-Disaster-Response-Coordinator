@@ -28,12 +28,15 @@ function meetsMinSeverity(severity: string, min: string): boolean {
   return (SEVERITY_RANK[severity] ?? 6) <= (SEVERITY_RANK[min] ?? 6);
 }
 
-function isPositionFresh(position: GeoPosition | null, staleThresholdMs = 30000): boolean {
+function isPositionFresh(position: GeoPosition | null, staleThresholdMs = 300000): boolean {
   if (!position) return false;
   return Date.now() - position.timestamp < staleThresholdMs;
 }
 
-function isPositionAccurate(position: GeoPosition | null, maxAccuracyMeters = 100): boolean {
+// Network/Wi-Fi fixes on desktops routinely report accuracies in the hundreds
+// of metres, so a 100 m ceiling rejected perfectly usable positions and made
+// the dashboard claim GPS was disabled.
+function isPositionAccurate(position: GeoPosition | null, maxAccuracyMeters = 1000): boolean {
   if (!position) return false;
   return position.accuracy <= maxAccuracyMeters;
 }
@@ -104,8 +107,12 @@ export default function Dashboard() {
 
   const geolocation = useGeolocation({ watch: false });
   const browserPosition = geolocation.position;
-  const hasFreshPosition = isPositionFresh(browserPosition) && isPositionAccurate(browserPosition);
-  const position = hasFreshPosition ? browserPosition : null;
+  // A coarse fix still drives the nearby/weather panels, so it is used rather
+  // than discarded. Quality is reported as a notice instead of blanking the
+  // dashboard out behind a false "Enable GPS" prompt.
+  const position = browserPosition;
+  const coarsePosition = browserPosition !== null && !isPositionAccurate(browserPosition);
+  const isStalePosition = browserPosition !== null && !isPositionFresh(browserPosition);
 
   const { weather, loading: weatherLoading, error: weatherError } = useWeather(position);
 
@@ -291,6 +298,17 @@ export default function Dashboard() {
 
       {/* ===== Page Title ===== */}
       <h1 className="text-3xl font-bold font-display text-white tracking-tight">Dashboard</h1>
+
+      {coarsePosition && browserPosition && (
+        <div className="flex items-start gap-2 rounded-lg border border-warning-500/20 bg-warning-500/10 px-3 py-2 text-xs text-warning-300">
+          <MaterialIcon icon="gps_not_fixed" className="text-base shrink-0" />
+          <span>
+            Using an approximate location (±{Math.round(browserPosition.accuracy)}m
+            {isStalePosition ? ', last updated over 5 minutes ago' : ''}). Nearby results cover the area
+            around this point rather than your exact spot.
+          </span>
+        </div>
+      )}
 
       {/* ===== 1. Status Strip ===== */}
       <div className={`flex items-center gap-4 px-5 py-3.5 rounded-xl border ${riskDisplay.bg}`}>
