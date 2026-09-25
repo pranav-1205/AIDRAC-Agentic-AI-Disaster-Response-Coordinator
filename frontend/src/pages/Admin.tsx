@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import MaterialIcon from '../components/ui/MaterialIcon';
 import DashboardCard from '../components/DashboardCard';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -9,10 +9,9 @@ import Badge from '../components/ui/Badge';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { useGeolocation } from '../hooks/useGeolocation';
 import { adminApi, shelterApi, hospitalApi, disasterApi, alertApi, sosApi, locationApi } from '../services/api';
-import { Shelter, Hospital, Disaster, Alert, SOSStatus, SOSResponderType, AdminOverviewResponse, AdminZoneStatsResponse, AdminResponderResponse, AdminIncidentHistoryResponse, AdminAlertResponse, AdminUserResponse, AdminSOSResponse } from '../types';
-import { AlertTriangle, Navigation, UserCheck, Shield, MapPin, Clock, User, Users, Activity, CheckCircle, XCircle, Map, Target, RefreshCw, MoreVertical } from 'lucide-react';
+import { Shelter, Hospital, SOSStatus, SOSResponderType, AdminOverviewResponse, AdminZoneStatsResponse, AdminResponderResponse, AdminIncidentHistoryResponse, AdminSOSResponse } from '../types';
+import { AlertTriangle, Navigation, UserCheck, Shield, MapPin, Clock, User, Users, CheckCircle, XCircle, Map, RefreshCw, MoreVertical } from 'lucide-react';
 
 const STATUS_COLORS: Record<SOSStatus, string> = {
   active: 'bg-danger-500/20 border-danger-500/30 text-danger-400',
@@ -55,56 +54,6 @@ const STATUS_GROUPS: { key: string; label: string; statuses: SOSStatus[] }[] = [
   { key: 'resolved', label: 'RESOLVED', statuses: ['assistance_provided', 'user_confirmed_safe', 'resolved'] },
 ];
 
-function AlertSeverityColor(severity: string): string {
-  switch (severity) {
-    case 'critical': return '#dc2626';
-    case 'severe': return '#ea580c';
-    case 'high': return '#ca8a04';
-    case 'warning': return '#f97316';
-    case 'advisory': return '#2563eb';
-    case 'info': return '#2563eb';
-    default: return '#64748b';
-  }
-}
-
-function AlertSeverityBadge({ severity }: { severity: string }) {
-  return (
-    <Badge variant="info" className="text-xs" style={{ backgroundColor: `${AlertSeverityColor(severity)}20`, borderColor: `${AlertSeverityColor(severity)}40`, color: AlertSeverityColor(severity) }}>
-      {severity.toUpperCase()}
-    </Badge>
-  );
-}
-
-function AdminMap({ alerts, sosIncidents, responders, users, activeDisasters, position, settings }: {
-  alerts: Alert[];
-  sosIncidents: AdminSOSResponse[];
-  responders: AdminResponderResponse[];
-  users: AdminUserResponse[];
-  activeDisasters: Disaster[];
-  position: { lat: number; lng: number } | null;
-  settings: any;
-}) {
-  if (!position) return (
-    <div className="h-[400px] flex items-center justify-center bg-slate-900/50 rounded-xl border border-slate-700/40">
-      <div className="text-center text-slate-500">
-        <MaterialIcon icon="gps_off" className="text-4xl mx-auto mb-2" />
-        <p>Enable GPS to view map</p>
-      </div>
-    </div>
-  );
-
-  return (
-    <Card variant="glass" padding="none" className="h-[500px] overflow-hidden">
-      <div className="h-full">
-        <iframe
-          src={`/map?admin=true&lat=${position.lat}&lng=${position.lng}`}
-          className="w-full h-full border-0"
-          title="Admin Live Map"
-        />
-      </div>
-    </Card>
-  );
-}
 
 function SOSStatusGroup({ statuses, label, incidents, onAction }: {
   statuses: SOSStatus[];
@@ -321,16 +270,9 @@ export default function Admin() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const { settings } = useSettings();
-  const geolocation = useGeolocation({ watch: settings.auto_locate });
-  const position = geolocation.position;
 
   const { data: overview, loading: overviewLoading, refetch: refetchOverview } = useApi<AdminOverviewResponse>(
     () => adminApi.getOverview(),
-    []
-  );
-
-  const { data: alerts, loading: alertsLoading, refetch: refetchAlerts } = useApi<AdminAlertResponse[]>(
-    () => adminApi.getAlerts({ active_only: true, limit: 50 }),
     []
   );
 
@@ -344,19 +286,12 @@ export default function Admin() {
     []
   );
 
-  const { data: disasters, loading: disastersLoading } = useApi<Disaster[]>(() => disasterApi.getAll());
-
   const { data: zoneStats, loading: zoneStatsLoading, refetch: refetchZoneStats } = useApi<AdminZoneStatsResponse>(
     () => adminApi.getZoneStats(),
     []
   );
 
-  const loading = overviewLoading || alertsLoading || sosLoading || respondersLoading || disastersLoading;
-
-  const activeDisasters = useMemo(() => 
-    disasters?.filter((d) => d.status === 'active') ?? [], 
-    [disasters]
-  );
+  const loading = overviewLoading || sosLoading || respondersLoading;
 
   const handleSOSAction = useCallback(async (sos: AdminSOSResponse, action: string) => {
     try {
@@ -404,7 +339,7 @@ export default function Admin() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           <button
-            onClick={() => { refetchOverview(); refetchAlerts(); refetchSOS(); refetchResponders(); refetchZoneStats(); }}
+            onClick={() => { refetchOverview(); refetchSOS(); refetchResponders(); refetchZoneStats(); }}
             className="p-2 rounded-lg bg-slate-800/50 border border-slate-700/40 hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"
             title="Refresh All"
           >
@@ -469,20 +404,6 @@ export default function Admin() {
       {/* Zone Statistics */}
       <ZoneStatsPanel stats={zoneStats} onRefresh={refetchZoneStats} />
 
-      {/* Live Disaster Map */}
-      <Card variant="glass" padding="md" className="h-[550px]">
-        <SectionHeader title="Live Disaster Map" subtitle="Real-time view of alerts, SOS incidents, and responders" />
-        <AdminMap
-          alerts={alerts || []}
-          sosIncidents={sosIncidents || []}
-          responders={responders || []}
-          users={[]}
-          activeDisasters={activeDisasters}
-          position={position ? { lat: position.lat, lng: position.lng } : null}
-          settings={settings}
-        />
-      </Card>
-
       {/* SOS Management by Status */}
       <div className="space-y-6">
         <SectionHeader title="SOS Incident Management" subtitle="Grouped by response status" />
@@ -503,59 +424,6 @@ export default function Admin() {
       <Card variant="glass" padding="md">
         <SectionHeader title="Available Nearby Responders" subtitle="Users with location sharing enabled who can be assigned to SOS incidents" />
         <ResponderList responders={responders || []} onAssign={handleAssignResponder} />
-      </Card>
-
-      {/* Alert Overview */}
-      <Card variant="glass" padding="md">
-        <SectionHeader title="Active Government Alerts" subtitle="CAP alerts from IMD/NDMA" />
-        {(alerts || []).length > 0 ? (
-          <div className="space-y-3">
-            {(alerts || []).slice(0, 10).map((alert) => (
-              <div key={alert.id} className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h4 className="font-medium text-white">{alert.title}</h4>
-                    <AlertSeverityBadge severity={alert.severity} />
-                    {alert.source && (
-                      <Badge variant="info" size="xs" className="text-[10px]">
-                        {alert.source.toUpperCase()}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-sm text-slate-300 mt-1 line-clamp-2">{alert.message}</p>
-                  <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-400 font-mono uppercase tracking-wider">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {alert.area || 'Area not specified'}
-                    </span>
-                    {alert.latitude && alert.longitude && (
-                      <span className="flex items-center gap-1">
-                        <Target className="h-3 w-3" />
-                        {alert.latitude.toFixed(4)}, {alert.longitude.toFixed(4)}
-                      </span>
-                    )}
-                    {alert.event && (
-                      <span className="flex items-center gap-1">
-                        <Activity className="h-3 w-3" />
-                        {alert.event}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-            {(alerts || []).length > 10 && (
-              <p className="text-sm text-slate-500 text-center py-2">
-                +{(alerts || []).length - 10} more alerts
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 py-5 text-base text-slate-500">
-            <CheckCircle className="text-success-500" />
-            No active government alerts
-          </div>
-        )}
       </Card>
 
       {/* Incident History */}
