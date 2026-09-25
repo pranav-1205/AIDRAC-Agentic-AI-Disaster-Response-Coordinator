@@ -30,4 +30,5 @@ Thumbs.db
 
 # AI-generated documentation
 docs/
-backend/docs/
+backend/docs/backend/.env.backup
+backend/.env.backup

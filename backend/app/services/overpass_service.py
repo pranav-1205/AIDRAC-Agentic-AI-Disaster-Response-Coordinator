@@ -1,18 +1,35 @@
+import time
+
 import httpx
 from typing import Any, Optional
 from app.config.settings import settings
 from app.utils.latency import LatencyTracker
 
 TIMEOUT = 15
+# Large radii cost Overpass far more time (the work grows with the area searched).
+# A fixed 15s budget is fine for ~25km but starves wide searches, which previously
+# made whole categories silently come back empty.
+TIMEOUT_MAX = 60
+TIMEOUT_PER_KM = 0.45
+# Ceiling for one category's lookup across every mirror.
+TOTAL_BUDGET = 90
 
 FALLBACK_URLS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ]
 
 
+def timeout_for_radius(radius: int) -> int:
+    """Scale the Overpass budget with the search radius, within sane bounds."""
+    radius_km = max(0.0, radius / 1000.0)
+    return int(min(TIMEOUT_MAX, max(TIMEOUT, TIMEOUT + radius_km * TIMEOUT_PER_KM)))
+
+
 class OverpassService:
-    async def query(self, overpass_ql: str, _tracker: Optional[LatencyTracker] = None) -> list[dict[str, Any]]:
+    async def query(self, overpass_ql: str, _tracker: Optional[LatencyTracker] = None, timeout: int = TIMEOUT) -> list[dict[str, Any]]:
         if _tracker:
             _tracker.start("overpass_query")
         
@@ -25,10 +42,18 @@ class OverpassService:
                 seen_urls.append(url)
 
         last_error: Exception | None = None
+        # Hard ceiling for the whole lookup, so trying extra mirrors can never turn
+        # one slow category into a multi-minute HTTP request.
+        deadline = time.monotonic() + TOTAL_BUDGET
         for url in seen_urls:
+            remaining = deadline - time.monotonic()
+            if remaining <= 1:
+                print("[overpass] overall budget exhausted, skipping remaining mirrors")
+                break
+            per_try = max(5, min(timeout, int(remaining)))
             try:
-                async with httpx.AsyncClient(timeout=TIMEOUT, headers={"User-Agent": "AIDRAC/1.0"}) as client:
-                    resp = await client.post(url, data={"data": overpass_ql})
+                async with httpx.AsyncClient(timeout=per_try, headers={"User-Agent": "AIDRAC/1.0"}) as client:
+                    resp = await client.post(url, data={"data": overpass_ql}, timeout=per_try)
                     resp.raise_for_status()
                     data = resp.json()
                 print(f"[overpass] OK: {url}")
@@ -38,7 +63,7 @@ class OverpassService:
                     _tracker.end("overpass_query")
                 return result
             except httpx.TimeoutException:
-                print(f"[overpass] timeout: {url}")
+                print(f"[overpass] timeout ({per_try}s): {url}")
                 last_error = OverpassError("Overpass API timed out")
             except httpx.HTTPStatusError as e:
                 print(f"[overpass] HTTP {e.response.status_code}: {url}")
@@ -86,7 +111,7 @@ class OverpassService:
             for el_type in ("node", "way", "relation"):
                 lines.append(f"                {el_type}{tag_filter}(around:{radius},{lat},{lng});")
         return f"""
-            [out:json][timeout:{TIMEOUT}];
+            [out:json][timeout:{timeout_for_radius(radius)}];
             (
 {chr(10).join(lines)}
             );

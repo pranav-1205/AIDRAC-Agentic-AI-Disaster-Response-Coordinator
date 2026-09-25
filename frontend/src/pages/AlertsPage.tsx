@@ -27,7 +27,7 @@ const severityConfig = {
 
 export default function AlertsPage() {
   const { settings } = useSettings();
-  const { data: alerts, loading, error, refetch } = useApi<Alert[]>(() => alertApi.getAll());
+  const { data: alerts, loading, error, forceRefetch } = useApi<Alert[]>(() => alertApi.getAll());
 
   const filtered = useMemo(() => {
     if (!alerts) return [];
@@ -35,7 +35,7 @@ export default function AlertsPage() {
   }, [alerts, settings.min_alert_severity]);
 
   if (loading) return <LoadingSpinner />;
-  if (error) return <ErrorState message={error} onRetry={refetch} />;
+  if (error) return <ErrorState message={error} onRetry={forceRefetch} />;
   if (!alerts || alerts.length === 0) return <EmptyState title="No Alerts" description="There are no emergency alerts at this time." />;
   if (filtered.length === 0) return <EmptyState title="No Alerts" description={`No alerts at "${settings.min_alert_severity}" severity or higher.`} />;
 

@@ -136,6 +136,7 @@ export interface NearbyPlace {
   longitude: number;
   distance: number;
   address: string | null;
+  category?: string;
 }
 
 export interface NearbyResponse {

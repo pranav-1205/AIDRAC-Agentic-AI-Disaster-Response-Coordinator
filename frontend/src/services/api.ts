@@ -1,4 +1,11 @@
 import axios from 'axios';
+import {
+  CACHE_TTL,
+  cachedRequest,
+  invalidateApiCache,
+  nearbyCacheKey,
+  type CachedRequestOptions,
+} from './apiCache';
 
 const api = axios.create({
   baseURL: '/api',
@@ -34,30 +41,54 @@ export const authApi = {
 };
 
 export const shelterApi = {
-  getAll: () => api.get('/shelters'),
-  create: (data: any) => api.post('/shelters', data),
-  update: (id: number, data: any) => api.put(`/shelters/${id}`, data),
-  delete: (id: number) => api.delete(`/shelters/${id}`),
+  // Cached: static reference data, requested by Map, Dashboard and Admin.
+  // Mutations below invalidate it so the UI never shows a stale list.
+  getAll: (options?: CachedRequestOptions) =>
+    cachedRequest('shelters:all', CACHE_TTL.reference, () => api.get('/shelters'), options),
+  create: (data: any) =>
+    api.post('/shelters', data).then((res) => {
+      invalidateApiCache('shelters:');
+      return res;
+    }),
+  update: (id: number, data: any) =>
+    api.put(`/shelters/${id}`, data).then((res) => {
+      invalidateApiCache('shelters:');
+      return res;
+    }),
+  delete: (id: number) =>
+    api.delete(`/shelters/${id}`).then((res) => {
+      invalidateApiCache('shelters:');
+      return res;
+    }),
 };
 
 export const hospitalApi = {
-  getAll: () => api.get('/hospitals'),
-  create: (data: any) => api.post('/hospitals', data),
+  getAll: (options?: CachedRequestOptions) =>
+    cachedRequest('hospitals:all', CACHE_TTL.reference, () => api.get('/hospitals'), options),
+  create: (data: any) =>
+    api.post('/hospitals', data).then((res) => {
+      invalidateApiCache('hospitals:');
+      return res;
+    }),
 };
 
 export const disasterApi = {
+  // Not cached: status/severity changes drive map + risk rendering.
   getAll: () => api.get('/disasters'),
   getActive: () => api.get('/disasters/active'),
   create: (data: any) => api.post('/disasters', data),
 };
 
 export const alertApi = {
+  // Not cached: alerts expire and change severity, so staleness is user-visible
+  // and would risk showing inactive/expired entries.
   getAll: (params?: { lat?: number; lng?: number; all?: boolean }) =>
     api.get('/alerts', { params }),
   create: (data: any) => api.post('/alerts', data),
 };
 
 export const settingsApi = {
+  // Not cached: must reflect the signed-in user and updates applied via update().
   get: () => api.get('/users/settings'),
   update: (data: Record<string, unknown>) => api.put('/users/settings', data),
 };
@@ -68,20 +99,44 @@ export const routeApi = {
 };
 
 export const weatherApi = {
+  // Not cached: useWeather already re-polls on its own 5-minute interval.
   get: (lat: number, lng: number) =>
     api.get('/weather', { params: { lat, lng } }),
 };
 
+const DEFAULT_RADIUS = 10_000;
+
 export const locationApi = {
-  nearby: (lat: number, lng: number, radius?: number) =>
-    api.get('/location/nearby', { params: { lat, lng, radius: radius ?? 10_000 } }),
+  /**
+   * Nearby OSM infrastructure (hospitals, shelters, community centres, schools,
+   * police, fire stations, pharmacies).
+   *
+   * Backed by a single Overpass fan-out on the server, so this is the most
+   * expensive read in the app and the one repeated by Shelters, Hospitals,
+   * Dashboard and Map. Results are shared in-memory for CACHE_TTL.nearby and
+   * concurrent identical calls collapse into one HTTP request.
+   *
+   * The 4th argument is optional; existing `locationApi.nearby(lat, lng, radius)`
+   * call sites keep working and gain caching automatically.
+   */
+  nearby: (lat: number, lng: number, radius?: number, options?: CachedRequestOptions) => {
+    const effectiveRadius = radius ?? DEFAULT_RADIUS;
+    return cachedRequest(
+      nearbyCacheKey(lat, lng, effectiveRadius),
+      CACHE_TTL.nearby,
+      () => api.get('/location/nearby', { params: { lat, lng, radius: effectiveRadius } }),
+      options
+    );
+  },
+  // Not cached: scored per request and currently unused by the UI.
   safeDestination: (lat: number, lng: number, radius?: number) =>
-    api.get('/location/safe-destination', { params: { lat, lng, radius: radius ?? 10_000 } }),
+    api.get('/location/safe-destination', { params: { lat, lng, radius: radius ?? DEFAULT_RADIUS } }),
 };
 
 export const userApi = {
   updateLocation: (data: { latitude: number; longitude: number; accuracy?: number; timestamp?: number }) =>
     api.post('/users/location', data),
+  // Never cached: live presence for disaster coordination, polled every 30s.
   getNearbyUsers: (lat: number, lng: number, radiusKm?: number) =>
     api.get('/users/nearby', { params: { lat, lng, radius_km: radiusKm ?? 10 } }),
 };

@@ -1,7 +1,7 @@
 import math
 import time
 from typing import Any, Optional
-from app.services.overpass_service import OverpassService, OverpassError
+from app.services.overpass_service import OverpassService, OverpassError, timeout_for_radius
 from app.utils.latency import LatencyTracker
 
 DEFAULT_RADIUS = 10_000
@@ -78,8 +78,12 @@ class LocationService:
 
         q = self._overpass.build_query(tags, lat, lng, radius)
         try:
-            raw = await self._overpass.query(q, _tracker=_tracker)
-        except OverpassError:
+            raw = await self._overpass.query(q, _tracker=_tracker, timeout=timeout_for_radius(radius))
+        except OverpassError as exc:
+            # An empty list here is indistinguishable downstream from "there are
+            # genuinely none nearby", which is dangerous for an emergency app, so
+            # make the failure loud instead of letting it masquerade as no data.
+            print(f"[nearby] LOOKUP FAILED category={category} radius={radius} lat={lat} lng={lng}: {exc}")
             return []
 
         results = []

@@ -330,13 +330,24 @@ export default function MapPage() {
   const overpassLoaded = !nearbyLoading && !!nearby;
 
   const liveShelters = useMemo(() => nearby?.shelters ?? [], [nearby]);
+  const liveCommunityCentres = useMemo(() => nearby?.community_centres ?? [], [nearby]);
+  const liveSchools = useMemo(() => nearby?.schools ?? [], [nearby]);
   const liveHospitals = useMemo(() => nearby?.hospitals ?? [], [nearby]);
   const livePolice = useMemo(() => nearby?.police ?? [], [nearby]);
   const liveFirestations = useMemo(() => nearby?.firestations ?? [], [nearby]);
   const livePharmacies = useMemo(() => nearby?.pharmacies ?? [], [nearby]);
 
   const allShelters: NearbyPlace[] = useMemo(() => {
-    if (hasGps) return overpassLoaded ? liveShelters : [];
+    if (hasGps) {
+      if (!overpassLoaded) return [];
+      // Combine shelters, community centres, and schools like the Shelters page does
+      const combined: NearbyPlace[] = [
+        ...liveShelters.map((p) => ({ ...p, category: 'shelter' as const })),
+        ...liveCommunityCentres.map((p) => ({ ...p, category: 'community_centre' as const })),
+        ...liveSchools.map((p) => ({ ...p, category: 'school' as const })),
+      ];
+      return combined.sort((a, b) => a.distance - b.distance);
+    }
     return (dbShelters ?? []).map((s) => ({
       name: s.name,
       latitude: s.latitude,
@@ -344,7 +355,7 @@ export default function MapPage() {
       distance: 0,
       address: s.address ?? null,
     }));
-  }, [liveShelters, dbShelters, hasGps, overpassLoaded]);
+  }, [liveShelters, liveCommunityCentres, liveSchools, dbShelters, hasGps, overpassLoaded]);
 
   const allHospitals: (NearbyPlace & { emergency_available?: boolean })[] = useMemo(() => {
     if (hasGps) return overpassLoaded ? liveHospitals : [];
@@ -403,7 +414,15 @@ export default function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { if (currentPosition && settings.auto_locate) refetchNearby(); }, [currentPosition?.lat, currentPosition?.lng, settings.auto_locate]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Deliberately the cache-respecting `refetch`, not `forceRefetch`: with
+  // watch-mode GPS this effect fires on every position fix, and forcing here
+  // would bypass the cache and hammer Overpass on each one. A materially changed
+  // position produces a different cache key and refetches anyway.
+  useEffect(() => {
+    if (currentPosition && settings.auto_locate) {
+      refetchNearby();
+    }
+  }, [currentPosition?.lat, currentPosition?.lng, settings.auto_locate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const routeBounds = useMemo(() => {
     if (!route?.coordinates.length) return null;
@@ -421,7 +440,7 @@ export default function MapPage() {
   const showDisasters = (showAll || activeLayer === 'disasters') && settings.show_user_disasters;
   const showGovAlerts = (showAll || activeLayer === 'gov_alerts') && settings.show_gov_alerts;
 
-  const markerLimit = showAll ? 5 : Infinity;
+  const markerLimit = showAll ? 50 : Infinity;
 
   const setDestination = useCallback((dest: NearestItem<NearbyPlace>, type: EmergencyDestinationType) => {
     setLocalDest({ destination: dest, type });
@@ -605,6 +624,11 @@ export default function MapPage() {
                   <Popup>
                     <div className="text-sm">
                       <p className="font-medium">{s.name}</p>
+                      {s.category && (
+                        <p className="text-sm font-mono uppercase tracking-widest text-on-surface-variant mt-0.5">
+                          {DESTINATION_LABELS[s.category as keyof typeof DESTINATION_LABELS] ?? s.category}
+                        </p>
+                      )}
                       <p className="text-xs text-on-surface-variant">{s.distance.toFixed(2)} km away</p>
                       {s.address && <p className="text-xs text-on-surface-variant">{s.address}</p>}
                     </div>
