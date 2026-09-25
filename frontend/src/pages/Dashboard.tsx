@@ -331,15 +331,6 @@ export default function Dashboard() {
               ? `${nearbyDisasters.length} nearby threat${nearbyDisasters.length !== 1 ? 's' : ''}`
               : 'No nearby threats'}
         </span>
-        {riskData && riskData.regional_alert_severity !== 'NONE' && (
-          <>
-            <span className="hidden lg:inline text-sm text-slate-600">·</span>
-            <span className="hidden lg:flex items-center gap-1.5 text-sm">
-              <span className={`w-2 h-2 rounded-full ${riskData.regional_alert_severity === 'CRITICAL' || riskData.regional_alert_severity === 'SEVERE' ? 'bg-red-500' : riskData.regional_alert_severity === 'HIGH' ? 'bg-orange-500' : 'bg-yellow-500'}`} />
-              Regional: {riskData.regional_alert_severity}
-            </span>
-          </>
-        )}
         <span className="hidden lg:inline text-sm text-slate-600">·</span>
         <span className="hidden lg:flex items-center gap-1.5 text-sm text-slate-600">
           <span className={`w-2 h-2 rounded-full ${position ? 'bg-green-500' : 'bg-slate-600'}`} />
