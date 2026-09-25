@@ -7,6 +7,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Serve a real manifest during dev. Without this, /manifest.webmanifest
+      // falls through to the SPA index.html (Content-Type: text/html) and the
+      // browser logs a JSON parse error.
+      devOptions: {
+        enabled: true,
+      },
       includeAssets: ['favicon.ico', 'vite.svg'],
       manifest: {
         name: 'AIDRAC - Disaster Response Coordinator',

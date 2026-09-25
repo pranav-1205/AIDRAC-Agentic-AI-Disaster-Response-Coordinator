@@ -17,6 +17,7 @@ assets/
 # Node
 node_modules/
 frontend/dist/
+frontend/dev-dist/
 *.tsbuildinfo
 
 # IDE
