@@ -20,7 +20,7 @@ from app.utils.security import hash_password
 
 ADMIN_EMAIL = "admin@aidrac.com"
 ADMIN_NAME = "AIDRAC System Administrator"
-ADMIN_PASSWORD = "AIDRAC-Admin@2026!"
+ADMIN_PASSWORD = "Admin@2026"
 
 
 async def create_admin_user(db: AsyncSession) -> User:
